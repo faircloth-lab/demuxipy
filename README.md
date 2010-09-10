@@ -40,7 +40,7 @@ See `LICENSE.markdown` for standard, 2-clause BSD license.
 
 You run the program using:
 
-    python --configuration=linker-py.conf`
+    python linker.py --configuration=linker-py.conf`
 
 
 ## Extras (in `helpers/`)
