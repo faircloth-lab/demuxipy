@@ -31,10 +31,10 @@ There are several things you will likely want to do before you run the program:
 
 1. you can look at the data in this database with the following query (which leaves off the BLOB column):
 
-    select id, name, mid, mid_seq, mid_match, mid_method, linker, linker_seq,
-    linker_match, linker_method, cluster, concat_seq, concat_match,
-    concat_method, n_count, untrimmed_len, trimmed_len, seq_trimmed from
-    sequence;
+        SELECT id, name, mid, mid_seq, mid_match, mid_method, linker,   
+        linker_seq, linker_match, linker_method, cluster, concat_seq, 
+        concat_match, concat_method, n_count, untrimmed_len, trimmed_len, 
+        seq_trimmed FROM sequence;
 
 1. You can get the data out and into some fasta files with:
 
