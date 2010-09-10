@@ -3,7 +3,7 @@
 Copyright (c) 2009-2010 Brant C. Faircloth.
 All rights reserved.
 
-See `LICENSE.markdown` for standard, 2-clause BSD license.
+See `LICENSE.md` for standard, 2-clause BSD license.
 
 ## Description
 
