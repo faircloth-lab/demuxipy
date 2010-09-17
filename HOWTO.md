@@ -6,7 +6,7 @@ There are several things you will likely want to do before you run the program:
 
 1. you will need to fill out the linker-py.conf file appropriately.  this means that if you are using hierarchical tags, you need to list which MID+SimpleX go together to give what combination (e.g. MID16, SimpleX2 = unicorns).  If you used RLMIDs, then use those in the combinations instead (e.g. RLMID1, SimpleX2 = unicorns) Only list those combinations you used in your run, otherwise, things will go slower (the program will look for all additional combinations that are not there).  You SHOULD NOT have to input the actual MID, RLMID, or SimpleX sequences, provided they are the same as those provided at the bottom of the file ("Sequence Tag Section").
 
-2. you may want to change MinQualScore (in linker-py.conf) from 10 to something higher - this is the min score to trim off the ends, which happens before we search for tags2. you may want to change MinQualScore (in linker-py.conf) from 10 to something higher - this is the min score to trim off the ends, which happens before we search for tags.
+2. you may want to change MinQualScore (in linker-py.conf) from 10 to something higher - this is the min score to trim off the ends, which happens before we search for tags.
 
 3. you will want to add your database parameters to linker-py.conf and make sure that it's setup for multiprocessing.you will want to add your database parameters to the file and make sure that it's setup for multiprocessing.
 
