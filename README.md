@@ -38,6 +38,8 @@ See `LICENSE.md` for standard, 2-clause BSD license.
 
 ## Invocation
 
+See [HOWTO.md](HOWTO.md) for additional information.
+
 You run the program using:
 
     python linker.py --configuration=linker-py.conf
