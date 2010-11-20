@@ -53,7 +53,7 @@ You run the program using:
         
         python levenshtein.py --configuration=linker-py.conf --section=Linker
 
-* `make_levenshtein_tags.py` - this script creates a set of sequence tags of the specified Levenshtein distance between the tags.  Requires pylevenshtein (see Dependencies above).  Also, slow for tag generation where tags >9nt, thus 9nt and 10nt tags are available via **Downloads** above.  The set of 10nt tags took approximately 72 hours to generate on an 8-core xeon-class machine.  For example, to produce the set of 5nt; edit distance 3 and 4 tags, run the following:
+* `make_levenshtein_tags.py` - this script creates a set of sequence tags of the specified Levenshtein distance between the tags.  Requires pylevenshtein (see Dependencies above).  Also, slow for tag generation where tags >9nt, thus 9nt and 10nt tags are available via [Downloads](https://github.com/brantfaircloth/linker-py/archives/master) above.  The set of 10nt tags took approximately 72 hours to generate on an 8-core xeon-class machine.  For example, to produce the set of 5nt; edit distance 3 and 4 tags, run the following:
 
         python make_levenshtein_tags.py --tag-length=5 --edit-distance=3 \
             --no-polybase --gc --comp --use-c --multiprocessing --min-and-greater
