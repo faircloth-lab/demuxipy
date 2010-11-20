@@ -61,6 +61,10 @@ You run the program using:
  * `get_parsed_reads.py` - this script will retrieve sequence from the database given a number of criteria
         
         python get_parsed_reads.py --configuration=linker-py.conf
+
+## Frequently Asked Questions ##
+
+See the [FAQ](https://github.com/brantfaircloth/linker-py/wiki/FAQ)
         
 ## Suggested Reading
 
