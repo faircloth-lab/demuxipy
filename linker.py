@@ -147,12 +147,11 @@ def qualTrimming(sequence, min_score=10):
         right_trim = right_trim.end()
     return trim(sequence, left_trim, right_trim)
 
-def midTrim(sequence, tags, max_gap_char=5, **kwargs):
+def midTrim(sequence, tags, max_gap_char, mid_len, **kwargs):
     '''Remove the MID tag from the sequence read'''
     #if sequence.id == 'MID_No_Error_ATACGACGTA':
     #    pdb.set_trace()
-    s = str(sequence.seq)
-    mid = leftLinker(s, tags, max_gap_char, True, fuzzy=kwargs['fuzzy'], allowed_errors=kwargs['allowed_errors'])
+    mid = leftLinker(sequence, tags, max_gap_char, mid_len, True, fuzzy=kwargs['fuzzy'], allowed_errors=kwargs['allowed_errors'])
     if mid:
         trimmed = trim(sequence, mid[3])
         tag, m_type, seq_match = mid[0], mid[1], mid[4]
@@ -168,15 +167,16 @@ def SWMatchPos(seq_match_span, start, stop):
         stop = stop - seq_match_span.count('-')
     return start, stop
 
-def leftLinker(s, tags, max_gap_char, gaps=False, **kwargs):
+def leftLinker(sequence, tags, max_gap_char, mid_len, gaps=False, **kwargs):
     '''Matching methods for left linker - regex first, followed by fuzzy (SW)
     alignment, if the option is passed'''
+    s = str(sequence.seq)
     for tag in tags:
         if gaps:
-            r = re.compile(('^%s') % (tag))
+            regex = re.compile(('^%s') % (tag))
         else:
-            r = re.compile(('^[acgtnACGTN]{0,%s}%s') % (max_gap_char, tag))
-        match = re.search(r, s)
+            regex = re.compile(('^[acgtnACGTN]{0,%s}%s') % (max_gap_char, tag))
+        match = regex.search(s)
         if match:
             m_type = 'regex'
             start, stop = match.start(), match.end()
@@ -186,7 +186,7 @@ def leftLinker(s, tags, max_gap_char, gaps=False, **kwargs):
     #if s == 'ACCTCGTGCGGAATCGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAG':
     #    pdb.set_trace()
     if not match and kwargs['fuzzy']:
-        match = smithWaterman(s, tags, kwargs['allowed_errors'])
+        match = smithWaterman(s[:max_gap_char + mid_len], tags, kwargs['allowed_errors'])
         # we can trim w/o regex
         if match:
             m_type = 'fuzzy'
@@ -198,18 +198,17 @@ def leftLinker(s, tags, max_gap_char, gaps=False, **kwargs):
     else:
         return None
 
-def rightLinker(s, tags, max_gap_char, gaps=False, **kwargs):
+def rightLinker(sequence, tags, max_gap_char, mid_len, gaps=False, **kwargs):
     '''Mathing methods for right linker - regex first, followed by fuzzy (SW)
     alignment, if the option is passed'''
-    #if s == 'GAGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAG':
-    #    pdb.set_trace()
+    s = str(sequence.seq)
     revtags = revCompTags(tags)
     for tag in revtags:
         if gaps:
-            r = re.compile(('%s$') % (tag))
+            regex = re.compile(('%s$') % (tag))
         else:
-            r = re.compile(('%s[acgtnACGTN]{0,%s}$') % (tag, max_gap_char))
-        match = re.search(r, s)
+            regex = re.compile(('%s[acgtnACGTN]{0,%s}$') % (tag, max_gap_char))
+        match = regex.search(s)
         if match:
             m_type = 'regex'
             start, stop = match.start(), match.end()
@@ -217,7 +216,7 @@ def rightLinker(s, tags, max_gap_char, gaps=False, **kwargs):
             seq_match = tag
             break
     if not match and kwargs['fuzzy']:
-        match = smithWaterman(s, revtags, kwargs['allowed_errors'])
+        match = smithWaterman(s[-(mid_len + max_gap_char):], revtags, kwargs['allowed_errors'])
         # we can trim w/o regex
         if match:
             m_type = 'fuzzy'
@@ -229,13 +228,13 @@ def rightLinker(s, tags, max_gap_char, gaps=False, **kwargs):
     else:
         return None
 
-def linkerTrim(sequence, tags, max_gap_char=22, **kwargs):
+def linkerTrim(sequence, tags, max_gap_char, mid_len, **kwargs):
     '''Use regular expression and (optionally) fuzzy string matching
     to locate and trim linkers from sequences'''
     m_type  = False
-    s       = str(sequence.seq)
-    left    = leftLinker(s, tags, max_gap_char=22, fuzzy=kwargs['fuzzy'], allowed_errors=kwargs['allowed_errors'])
-    right   = rightLinker(s, tags, max_gap_char=22, fuzzy=kwargs['fuzzy'], allowed_errors=kwargs['allowed_errors'])
+    left    = leftLinker(sequence, tags, max_gap_char, mid_len, fuzzy=kwargs['fuzzy'], allowed_errors=kwargs['allowed_errors'])
+    right   = rightLinker(sequence, tags, max_gap_char, mid_len, fuzzy=kwargs['fuzzy'], allowed_errors=kwargs['allowed_errors'])
+    s = str(sequence.seq)
     if left and right and left[0] == right[0]:
         # we can have lots of conditional matches here
         if left[2] <= max_gap_char and right[2] >= (len(s) - (len(right[0]) +\
@@ -434,7 +433,7 @@ def linkerWorker(sequence, params):
     tags = params.tags
     if params.midTrim:
         # search on 5' (left) end for MID
-        mid = midTrim(seqRecord.sequence, params.tags, params.midGap, fuzzy=params.fuzzy, allowed_errors=params.allowed_errors)
+        mid = midTrim(seqRecord.sequence, params.tags, params.midGap, params.mid_len, fuzzy=params.fuzzy, allowed_errors=params.allowed_errors)
         if mid:
             # if MID, search for exact matches (for and revcomp) on Linker
             # provided no exact matches, use fuzzy matching (Smith-Waterman) +
@@ -447,7 +446,7 @@ def linkerWorker(sequence, params):
             tags                    = params.tags[seqRecord.mid]
     #pdb.set_trace()
     if params.linkerTrim:
-        linker = linkerTrim(seqRecord.sequence, tags, params.linkerGap, fuzzy=params.fuzzy, allowed_errors=params.allowed_errors)
+        linker = linkerTrim(seqRecord.sequence, tags, params.linkerGap, params.mid_len, fuzzy=params.fuzzy, allowed_errors=params.allowed_errors)
         if linker:
             if linker[0]:
                 seqRecord.l_tag             = linker[0]
@@ -565,16 +564,24 @@ class Parameters():
     def _linkers(self):
         self.linkers         = dict(self.conf.items('Linker'))
         self.reverse_linkers = reverse(self.conf.items('Linker'), True)
+        lset = set([len(l) for l in self.linkers.values()])
+        assert len(lset) == 1, "Your linker sequences are difference lengths"
+        self.linker_len = lset.pop()
     
     def _mid(self):
         self.mids            = dict(self.conf.items('Mid'))
         self.reverse_mid     = reverse(self.conf.items('Mid'), True)
+        mset = set([len(m) for m in self.mids.values()])
+        assert len(mset) == 1, "Your MID sequences are different lengths"
+        self.mid_len = mset.pop()
+
     
     def _tagLibrary(self):
         '''Create a tag-library from the mids and the linkers which allows us to 
         track which organisms go with which MID+linker combo'''
         self.tags = {}
         for c in self.clust:
+            #pdb.set_trace()
             if self.mids and self.linkers:
                 m,l = c[0].replace(' ','').split(',')
                 org = c[1]
@@ -606,10 +613,10 @@ class Parameters():
                 l = c[0]
             elif self.mids and not self.linkers:
                 pass
-            all_tags.append(self.linkers[l])
-            all_tags_regex.append(re.compile('%s' % self.linkers[l]))
-            all_tags.append(revComp(self.linkers[l]))
-            all_tags_regex.append(re.compile('%s' % revComp(self.linkers[l])))
+            self.all_tags.append(self.linkers[l])
+            self.all_tags_regex.append(re.compile('%s' % self.linkers[l]))
+            self.all_tags.append(revComp(self.linkers[l]))
+            self.all_tags_regex.append(re.compile('%s' % revComp(self.linkers[l])))
 
 def main():
     '''Main loop'''
@@ -621,6 +628,8 @@ def main():
     conf.read(options.conf)
     # build our configuration
     params = Parameters(conf)
+    #pdb.set_trace()
+    #pdb.set_trace()
     conn = MySQLdb.connect(
         user=params.user,
         passwd=params.pwd,
