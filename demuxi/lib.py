@@ -11,23 +11,45 @@ Description:  common files for demuxi.py
 import os
 import sys
 import argparse
+from multiprocessing import cpu_count
+from tools.sequence.fasta import FastaSequence
 
 class FullPaths(argparse.Action):
     """Expand user- and relative-paths"""
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, os.path.abspath(os.path.expanduser(values)))
 
+class ListQueue(list):
+    def __init__(self):
+        list.__init__(self)
+    
+    def put(self, item):
+        """append an item to the list"""
+        self.append(item)
+    
+    def get(self):
+        """return an item from the list"""
+        return self.pop()
+
+    def __repr__(self):
+        return "ListQueue"
+
 class Parameters():
     '''linkers.py run parameters'''
     def __init__(self, conf):
-        self.conf            = conf
+        self.conf = conf
+        try:
+            self.fasta        = self.conf.get('Input','fasta')
+            self.quality      = self.conf.get('Input','quality')
+        except:
+            self.fastq       = self.conf.geet('Input','fastq')
         self.db              = self.conf.get('Database','DATABASE')
-        self.qualTrim        = self.conf.getboolean('Steps', 'QualTrim')
-        self.minQual         = self.conf.getint('GeneralParameters', 'MinQualScore')
-        self.midTrim         = self.conf.getboolean('Steps','MidTrim')
-        self.midGap          = self.conf.getint('GeneralParameters','MidGap')
-        self.linkerTrim      = self.conf.getboolean('Steps', 'LinkerTrim')
-        self.linkerGap       = self.conf.getint('GeneralParameters','LinkerGap')
+        self.qual_trim       = self.conf.getboolean('Steps', 'QualTrim')
+        self.min_qual         = self.conf.getint('GeneralParameters', 'MinQualScore')
+        self.mid_trim         = self.conf.getboolean('Steps','MidTrim')
+        self.mid_gap          = self.conf.getint('GeneralParameters','MidGap')
+        self.linker_trim      = self.conf.getboolean('Steps', 'LinkerTrim')
+        self.linker_gap       = self.conf.getint('GeneralParameters','LinkerGap')
         self.concat          = self.conf.getboolean('GeneralParameters','CheckForConcatemers')
         self.fuzzy           = self.conf.getboolean('GeneralParameters','FuzzyMatching')
         self.allowed_errors  = self.conf.getint('GeneralParameters','AllowedErrors')
@@ -39,24 +61,32 @@ class Parameters():
         self.tags            = None
         self.all_tags        = None
         self.all_tags_regex  = None
+        # compute # cores for computation; leave 1 for db and 1 for sys
+        if conf.get('Multiprocessing','processors').lower() == 'auto' and cpu_count > 2:
+            self.num_procs = cpu_count() - 1
+        elif conf.get('Multiprocessing','processors').lower() != 'auto' and \
+            cpu_count >= conf.getint('Multiprocessing','processors'):
+                self.num_procs = conf.getint('Multiprocessing','processors')
+        else:
+            self.num_procs = 1
         self._setup()
     
     def __repr__(self):
         return '''<linkers.parameters run values>'''
     
     def _setup(self):
-        if self.midTrim and self.linkerTrim:
+        if self.mid_trim and self.linker_trim:
             self._mid()
             self._linkers()
             self.clust       = self.conf.items('MidLinkerGroups')
             self._tagLibrary()
 
-        elif self.midTrim and not self.LinkerTrim:
+        elif self.mid_trim and not self.linker_trim:
             self_mid()
             self.clust       = self.conf.items('MidGroup')
             self._tagLibrary()
             
-        elif not self.midTrim and self.linkerTrim:
+        elif not self.mid_trim and self.linker_trim:
             self._linkers()
             self.clust       = self.conf.items('LinkerGroups')
             self._tagLibrary()
@@ -122,15 +152,13 @@ class Parameters():
             self.all_tags.append(revComp(self.linkers[l]))
             self.all_tags_regex.append(re.compile('%s' % revComp(self.linkers[l])))
 
-class Record():
+class Tagged():
     '''Trimming, tag, and sequence data for individual reads'''
     def __init__(self, sequence):
         # super(Params, self).__init__()
-        assert isinstance(sequence,SeqRecord), \
-            'The Record class must be instantiated with a BioPython Seq object'
-        self.unmod              = sequence # a biopython sequence object
-        self.sequence           = None
-        self.nCount             = None
+        assert isinstance(sequence,FastaSequence), \
+            'The Record class must be instantiated with a FastaSequence object'
+        self.read               = sequence # a biopython sequence object
         self.mid                = None
         self.mid_seq            = None
         self.reverse_mid        = None
@@ -148,8 +176,8 @@ class Record():
         self.concat_count       = None
         self.concat_seq_match   = None
     
-    def __repr__(self):
-        return '''<linkers.record for %s>''' % self.unmod.id
+    #def __repr__(self):
+    #    return '''<linkers.record for %s>''' % self.identifier
 
 def reverse(items, null=False):
     '''build a reverse dictionary from a list of tuples'''

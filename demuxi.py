@@ -35,10 +35,13 @@ import cPickle
 import sqlite3
 import argparse
 import progress
+import itertools
 import ConfigParser
-import multiprocessing
 
-from demuxi.lib import FullPaths, Record, Parameters
+from multiprocessing import Process, Queue, JoinableQueue, cpu_count
+
+from tools.sequence.fasta import FastaQualityReader
+from demuxi.lib import FullPaths, ListQueue, Tagged, Parameters
 
 from Bio import pairwise2
 from Bio.SeqIO import QualityIO
@@ -150,15 +153,16 @@ def qualTrimming(sequence, min_score=10):
         right_trim = right_trim.end()
     return trim(sequence, left_trim, right_trim)
 
-def midTrim(sequence, tags, max_gap_char, mid_len, **kwargs):
-    '''Remove the MID tag from the sequence read'''
+def mid_trim(tagged, tags, max_gap_char, mid_len, fuzzy, errors):
+    """Remove the MID tag from the sequence read"""
     #if sequence.id == 'MID_No_Error_ATACGACGTA':
     #    pdb.set_trace()
-    mid = leftLinker(sequence, tags, max_gap_char, mid_len, True, fuzzy=kwargs['fuzzy'], allowed_errors=kwargs['allowed_errors'])
+    mid = leftLinker(tagged.read.sequence, tags, max_gap_char, mid_len, fuzzy,
+        errors, gaps = True)
     if mid:
-        trimmed = trim(sequence, mid[3])
-        tag, m_type, seq_match = mid[0], mid[1], mid[4]
-        return tag, trimmed, seq_match, m_type
+        tagged.mid, tagged.mid_match, tagged_mid_type = mid[0],mid[1],mid[4]
+        tagged.read = tagged.read.slice(mid[3],len(tagged.read.sequence), False)
+        return tagged
     else:
         return None
 
@@ -170,10 +174,9 @@ def SWMatchPos(seq_match_span, start, stop):
         stop = stop - seq_match_span.count('-')
     return start, stop
 
-def leftLinker(sequence, tags, max_gap_char, mid_len, gaps=False, **kwargs):
+def leftLinker(s, tags, max_gap_char, mid_len, fuzzy, errors, gaps=False):
     '''Matching methods for left linker - regex first, followed by fuzzy (SW)
     alignment, if the option is passed'''
-    s = str(sequence.seq)
     for tag in tags:
         if gaps:
             regex = re.compile(('^%s') % (tag))
@@ -188,8 +191,8 @@ def leftLinker(sequence, tags, max_gap_char, mid_len, gaps=False, **kwargs):
             break
     #if s == 'ACCTCGTGCGGAATCGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAG':
     #    pdb.set_trace()
-    if not match and kwargs['fuzzy']:
-        match = smithWaterman(s[:max_gap_char + mid_len], tags, kwargs['allowed_errors'])
+    if not match and fuzzy:
+        match = smithWaterman(s[:max_gap_char + mid_len], tags, errors)
         # we can trim w/o regex
         if match:
             m_type = 'fuzzy'
@@ -201,10 +204,9 @@ def leftLinker(sequence, tags, max_gap_char, mid_len, gaps=False, **kwargs):
     else:
         return None
 
-def rightLinker(sequence, tags, max_gap_char, mid_len, gaps=False, **kwargs):
+def rightLinker(s, tags, max_gap_char, mid_len, fuzzy, errors, gaps=False):
     '''Mathing methods for right linker - regex first, followed by fuzzy (SW)
     alignment, if the option is passed'''
-    s = str(sequence.seq)
     revtags = revCompTags(tags)
     for tag in revtags:
         if gaps:
@@ -218,8 +220,8 @@ def rightLinker(sequence, tags, max_gap_char, mid_len, gaps=False, **kwargs):
             # by default, this is true
             seq_match = tag
             break
-    if not match and kwargs['fuzzy']:
-        match = smithWaterman(s[-(mid_len + max_gap_char):], revtags, kwargs['allowed_errors'])
+    if not match and fuzzy:
+        match = smithWaterman(s[-(mid_len + max_gap_char):], revtags, errors)
         # we can trim w/o regex
         if match:
             m_type = 'fuzzy'
@@ -231,12 +233,12 @@ def rightLinker(sequence, tags, max_gap_char, mid_len, gaps=False, **kwargs):
     else:
         return None
 
-def linkerTrim(sequence, tags, max_gap_char, mid_len, **kwargs):
+def linkerTrim(sequence, tags, max_gap_char, mid_len, fuzzy, errors):
     '''Use regular expression and (optionally) fuzzy string matching
     to locate and trim linkers from sequences'''
     m_type  = False
-    left    = leftLinker(sequence, tags, max_gap_char, mid_len, fuzzy=kwargs['fuzzy'], allowed_errors=kwargs['allowed_errors'])
-    right   = rightLinker(sequence, tags, max_gap_char, mid_len, fuzzy=kwargs['fuzzy'], allowed_errors=kwargs['allowed_errors'])
+    left    = leftLinker(sequence, tags, max_gap_char, mid_len, fuzzy, errors)
+    right   = rightLinker(sequence, tags, max_gap_char, mid_len, fuzzy, errors)
     s = str(sequence.seq)
     if left and right and left[0] == right[0]:
         # we can have lots of conditional matches here
@@ -363,7 +365,7 @@ def concatCheck(sequence, all_tags, all_tags_regex, reverse_linkers, **kwargs):
     else:
         return None, None, None
 
-def sequenceCount(input):
+def get_sequence_count(input):
     '''Determine the number of sequence reads in the input'''
     handle = open(input, 'rU')
     lines = handle.read().count('>')
@@ -401,30 +403,39 @@ def qualOnlyWorker(sequence, qual, conf):
     conn.close()
     return
 
-def linkerWorker(sequence, params):
-    # we need a separate connection for each mysql cursor or they are going
-    # start going into locking hell and things will go poorly. Creating a new 
-    # connection for each worker process is the easiest/laziest solution.
-    # Connection pooling (DB-API) didn't work so hot, but probably because 
-    # I'm slightly retarded.
-    conn = MySQLdb.connect(
-        user=params.user,
-        passwd=params.pwd,
-        db=params.db
-        )
-    cur = conn.cursor()
-    # for now, we'll keep this here
-    seqRecord = Record(sequence)
-    if params.qualTrim:
-        seqRecord.sequence = qualTrimming(seqRecord.unmod, params.minQual)
-    else:
-        seqRecord.sequence = seqRecord.unmod
-    seqRecord.nCount = str(seqRecord.sequence.seq).count('N')
-    #pdb.set_trace()
+def singleproc(job, results, params):
+    for sequence in job:
+        # for now, we'll keep this here
+        tagged = Tagged(sequence)
+        if params.qual_trim:
+            #pdb.set_trace()
+            tagged.read = tagged.read.trim(params.min_qual, False)
+        if params.mid_trim:
+            tagged = mid_trim(tagged, params.tags, params.mid_gap, \
+                    params.mid_len, params.fuzzy, params.allowed_errors)
+            #if mid:
+            #    tag.mid, tag.sequence, tag.seq_match, tag.m_type,
+            #        tag.reverse_mid, tags =
+            #        mid[0], mid[1], mid[2], mid[3],
+            #        params.reverse_mid[seqRecord.mid], params.tags[seqRecord.mid]
+
+        if tagged:
+            results.put(tagged)
+            pdb.set_trace()
+    return results
+
+def multiproc(jobs, results, params):
+    """locate linker sequences in a read, returning a record object"""
+    while True:
+        job = jobs.get()
+        if job is None:
+            break
+        _ = singleproc(job, results, params)
+    """#pdb.set_trace()
     tags = params.tags
     if params.midTrim:
         # search on 5' (left) end for MID
-        mid = midTrim(seqRecord.sequence, params.tags, params.midGap, params.mid_len, fuzzy=params.fuzzy, allowed_errors=params.allowed_errors)
+        mid = midTrim(seqRecord.sequence, params.tags, params.midGap, params.mid_len, params.fuzzy, params.allowed_errors)
         if mid:
             # if MID, search for exact matches (for and revcomp) on Linker
             # provided no exact matches, use fuzzy matching (Smith-Waterman) +
@@ -437,7 +448,8 @@ def linkerWorker(sequence, params):
             tags                    = params.tags[seqRecord.mid]
     #pdb.set_trace()
     if params.linkerTrim:
-        linker = linkerTrim(seqRecord.sequence, tags, params.linkerGap, params.mid_len, fuzzy=params.fuzzy, allowed_errors=params.allowed_errors)
+        linker = linkerTrim(seqRecord.sequence, tags, params.linkerGap,
+            params.mid_len, params.fuzzy, params.allowed_errors)
         if linker:
             if linker[0]:
                 seqRecord.l_tag             = linker[0]
@@ -479,6 +491,7 @@ def linkerWorker(sequence, params):
     # keep our connection load low
     conn.close()
     return
+    """
 
 def get_args():
     """get arguments (config file location)"""
@@ -488,82 +501,78 @@ def get_args():
             action=FullPaths)
     return parser.parse_args()
 
+def split_reads_into_groups(fasta, qual, num_reads, num_procs):
+    reads = FastaQualityReader(fasta, qual)
+    job_size = num_reads/num_procs
+    print "Parsing reads into groups of {} reads".format(job_size)
+    i = iter(reads)
+    chunk = list(itertools.islice(i,job_size))
+    while chunk:
+        yield chunk
+        chunk = list(itertools.islice(i, job_size))
+
 def main():
     '''Main loop'''
     start_time = time.time()
     motd()
     args = get_args()
     print 'Started: ', time.strftime("%a %b %d, %Y  %H:%M:%S", time.localtime(start_time))
+    # build our configuration object w/ input params
     conf = ConfigParser.ConfigParser()
     conf.read(args.config)
-    # build our configuration
     params = Parameters(conf)
-    #pdb.set_trace()
-    #pdb.set_trace()
+    # create the db and tables, returninn connection
+    # and cursor
     conn, cur = create_db_and_new_tables(params.db)
-    sys.exit()
-    # crank out a new table for the data
-    createSeqTable(cur)
-    conn.commit()
-    seqcount = sequenceCount(conf.get('Input','sequence'))
-    sequence = QualityIO.PairedFastaQualIterator(
-    open(conf.get('Input','sequence'), "rU"), 
-    open(conf.get('Input','qual'), "rU"))
-    #pdb.set_trace()
-    if conf.getboolean('Multiprocessing', 'MULTIPROCESSING'):
-        # get num processors
-        n_procs = conf.get('Multiprocessing','processors')
-        if n_procs == 'Auto':
-            # we'll use x-1 cores (where x = avail. cores)
-            n_procs = multiprocessing.cpu_count() - 1
-        else:
-            n_procs = int(n_procs)
-        print 'Multiprocessing.  Number of processors = ', n_procs
-        # to test with fewer sequences
-        #count = 0
-        try:
-            threads = []
-            pb = progress.bar(0,seqcount,60)
-            pb_inc = 0
-            while sequence:
-                if len(threads) < n_procs:
-                    p = multiprocessing.Process(
-                            target=linkerWorker, 
-                            args=(
-                                sequence.next(),
-                                params,
-                                )
-                            )
-                    p.start()
-                    threads.append(p)
-                    if (pb_inc+1)%1000 == 0:
-                        pb.__call__(pb_inc+1)
-                    elif pb_inc + 1 == seqcount:
-                        pb.__call__(pb_inc+1)
-                    pb_inc += 1
-                else:
-                    for t in threads:
-                        if not t.is_alive():
-                            threads.remove(t)
-        except StopIteration:
-            pass
+    # get read count of input
+    num_reads = get_sequence_count(params.fasta)
+    if params.num_procs > 1:
+        # split reads into generator objects based on equal
+        # split across cores
+        work = split_reads_into_groups(params.fasta, params.quality,
+                num_reads, params.num_procs)
     else:
-        print 'Not using multiprocessing'
-        count = 0
-        try:
-            pb = progress.bar(0,seqcount,60)
-            pb_inc = 0
-            #while count < 1000:
-            while sequence:
-                #count +=1
-                linkerWorker(sequence.next(), params)
-                if (pb_inc+1)%1000 == 0:
-                    pb.__call__(pb_inc+1)
-                elif pb_inc + 1 == seqcount:
-                    pb.__call__(pb_inc+1)
-                pb_inc += 1
-        except StopIteration:
-            pass
+        work = FastaQualityReader(params.fasta, params.quality)
+    # MULTICORE
+    if params.num_procs > 1:
+        jobs = Queue()
+        results = JoinableQueue()
+        # We're stacking groups of jobs on the work
+        # Queue, conceivably to save the overhead of
+        # placing them on there one-by-one.
+        for unit in work:
+            jobs.put(unit)
+        # setup the processes for the jobs
+        print "Starting {} workers".format(params.num_procs)
+        # start the worker processes
+        [Process(target = multiproc, args=(jobs, results, params)).start()
+            for i in xrange(params.num_procs)]
+        # we're putting single results on the results Queue so
+        # that the db can (in theory) consume them at
+        # a rather consistent rate rather than in spurts
+        #for unit in xrange(num_reads):
+        for unit in xrange(18):
+            #enter_to_db(results.get())
+            r = results.get()
+            print r.unmod
+            results.task_done()
+        # make sure we put None at end of Queue
+        # in an amount equiv. to num_procs
+        for unit in xrange(params.num_procs):
+            jobs.put(None)
+        # join the results, so that they can finish
+        results.join()
+        # close up our queues
+        jobs.close()
+        results.close()
+    # SINGLECORE
+    else:
+        results = ListQueue()
+        singleproc(work, results, params)
+        for r in results:
+            print r.unmod
+
+    
     print '\n'
     cur.close()
     conn.close()
