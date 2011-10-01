@@ -31,12 +31,14 @@ import re
 import time
 import numpy
 import string
-import MySQLdb
 import cPickle
 import optparse
 import progress
 import ConfigParser
 import multiprocessing
+
+from demuxi.lib import Record, Parameters
+
 from Bio import pairwise2
 from Bio.SeqIO import QualityIO
 from Bio.SeqRecord import SeqRecord
@@ -460,8 +462,6 @@ def linkerWorker(sequence, params):
     conn.close()
     return
 
-
-
 def interface():
     '''Command-line interface'''
     usage = "usage: %prog [options]"
@@ -493,7 +493,7 @@ def main():
     # build our configuration
     params = Parameters(conf)
     #pdb.set_trace()
-    #pdb.set_trace()
+    pdb.set_trace()
     conn = MySQLdb.connect(
         user=params.user,
         passwd=params.pwd,

@@ -144,3 +144,13 @@ class Record():
     
     def __repr__(self):
         return '''<linkers.record for %s>''' % self.unmod.id
+
+def reverse(items, null=False):
+    '''build a reverse dictionary from a list of tuples'''
+    l = []
+    if null:
+        items += ((None, None),)
+    for i in items:
+        t = (i[1],i[0])
+        l.append(t)
+    return dict(l)
