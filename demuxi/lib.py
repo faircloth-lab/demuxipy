@@ -8,14 +8,20 @@ Copyright (c) 2011 Brant C. Faircloth. All rights reserved.
 Description:  common files for demuxi.py
 
 """
+import os
+import sys
+import argparse
+
+class FullPaths(argparse.Action):
+    """Expand user- and relative-paths"""
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, os.path.abspath(os.path.expanduser(values)))
 
 class Parameters():
     '''linkers.py run parameters'''
     def __init__(self, conf):
         self.conf            = conf
         self.db              = self.conf.get('Database','DATABASE')
-        self.user            = self.conf.get('Database','USER')
-        self.pwd             = self.conf.get('Database','PASSWORD')
         self.qualTrim        = self.conf.getboolean('Steps', 'QualTrim')
         self.minQual         = self.conf.getint('GeneralParameters', 'MinQualScore')
         self.midTrim         = self.conf.getboolean('Steps','MidTrim')

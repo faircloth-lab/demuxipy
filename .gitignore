@@ -3,4 +3,4 @@
 *.pyc
 linker-dist-test.conf
 output/
-
+*.sqlite

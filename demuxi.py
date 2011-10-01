@@ -32,12 +32,13 @@ import time
 import numpy
 import string
 import cPickle
-import optparse
+import sqlite3
+import argparse
 import progress
 import ConfigParser
 import multiprocessing
 
-from demuxi.lib import Record, Parameters
+from demuxi.lib import FullPaths, Record, Parameters
 
 from Bio import pairwise2
 from Bio.SeqIO import QualityIO
@@ -286,36 +287,53 @@ def reverse(items, null=False):
         l.append(t)
     return dict(l)
 
-def createSeqTable(c):
-    '''Create necessary tables in our database to hold the sequence and 
-    tagging data'''
-    # TODO:  move blob column to its own table, indexed by id
-    # DONE:  move all tables to InnoDB??
+def create_db_and_new_tables(db_name):
+    conn = sqlite3.connect(db_name)
+    cur = conn.cursor()
+    cur.execute("PRAGMA foreign_keys = ON")
     try:
-        c.execute('''DROP TABLE sequence''')
-    except:
-        pass
-    c.execute('''CREATE TABLE sequence (id INT UNSIGNED NOT NULL 
-        AUTO_INCREMENT,name VARCHAR(100),mid VARCHAR(30),mid_seq VARCHAR(30),
-        mid_match VARCHAR(30),mid_method VARCHAR(50),linker VARCHAR(50),
-        linker_seq VARCHAR(50),linker_match VARCHAR(50),linker_method 
-        VARCHAR(50),cluster VARCHAR(75),concat_seq VARCHAR(50), 
-        concat_match varchar(50), concat_method VARCHAR(50),
-        n_count SMALLINT UNSIGNED, untrimmed_len SMALLINT UNSIGNED, 
-        seq_trimmed TEXT, trimmed_len SMALLINT UNSIGNED, record BLOB, PRIMARY
-        KEY (id), INDEX sequence_cluster (cluster)) ENGINE=InnoDB''')
-
-def createQualSeqTable(c):
-    # TODO:  move blob column to its own table, indexed by id
-    # DONE:  move all tables to InnoDB??
-    try:
-        c.execute('''DROP TABLE sequence''')
-    except:
-        pass
-    c.execute('''CREATE TABLE sequence (id INT UNSIGNED NOT NULL 
-        AUTO_INCREMENT,name VARCHAR(100), n_count SMALLINT UNSIGNED, 
-        untrimmed_len MEDIUMINT UNSIGNED, seq_trimmed MEDIUMTEXT, trimmed_len 
-        MEDIUMINT UNSIGNED, record MEDIUMBLOB, PRIMARY KEY (id)) ENGINE=InnoDB''')
+        cur.execute('''CREATE TABLE tags (
+            id integer PRIMARY KEY AUTOINCREMENT,
+            name text,
+            mid text,
+            mid_seq text,
+            mid_match text,
+            mid_method text,
+            linker text,
+            linker_seq text,
+            linker_match text,
+            linker_method text,
+            cluster text,
+            concat_seq text,
+            concat_match text,
+            concat_method text,
+            n_count integer,
+            untrimmed_len integer,
+            seq_trimmed text,
+            trimmed_len text,
+            record blob)
+            ''')
+        cur.execute('''CREATE TABLE sequence (
+            id INTEGER,
+            untrimmed_len, integer,
+            trimmed_len integer,
+            seq_trimmed text,
+            FOREIGN KEY(id) REFERENCES tags(id) DEFERRABLE INITIALLY
+            DEFERRED)''')
+        cur.execute("CREATE INDEX idx_sequence_cluster on tags(cluster)")
+    except sqlite3.OperationalError, e:
+        #pdb.set_trace()
+        if 'already exists' in e[0]:
+            answer = raw_input("\n\tDatabase already exists.  Overwrite [Y/n]? ")
+            #pdb.set_trace()
+            if answer == "Y" or answer == "YES":
+                os.remove(db_name)
+                conn, cur = create_db_and_new_tables(db_name)
+            else:
+                sys.exit()
+        else:
+            raise sqlite3.OperationalError, e
+    return conn, cur
 
 def concatCheck(sequence, all_tags, all_tags_regex, reverse_linkers, **kwargs):
     '''Check screened sequence for the presence of concatemers by scanning 
@@ -462,44 +480,28 @@ def linkerWorker(sequence, params):
     conn.close()
     return
 
-def interface():
-    '''Command-line interface'''
-    usage = "usage: %prog [options]"
-
-    p = optparse.OptionParser(usage)
-
-    p.add_option('--configuration', '-c', dest = 'conf', action='store', \
-type='string', default = None, help='The path to the configuration file.', \
-metavar='FILE')
-
-    (options,arg) = p.parse_args()
-    if not options.conf:
-        p.print_help()
-        sys.exit(2)
-    if not os.path.isfile(options.conf):
-        print "You must provide a valid path to the configuration file."
-        p.print_help()
-        sys.exit(2)
-    return options, arg
+def get_args():
+    """get arguments (config file location)"""
+    parser = argparse.ArgumentParser(description = "demuxi.py:  sequence " + \
+        "demultiplexing for hierarchically-tagged samples")
+    parser.add_argument('config', help="The input configuration file",
+            action=FullPaths)
+    return parser.parse_args()
 
 def main():
     '''Main loop'''
-    start_time      = time.time()
-    options, arg    = interface()
+    start_time = time.time()
     motd()
+    args = get_args()
     print 'Started: ', time.strftime("%a %b %d, %Y  %H:%M:%S", time.localtime(start_time))
-    conf            = ConfigParser.ConfigParser()
-    conf.read(options.conf)
+    conf = ConfigParser.ConfigParser()
+    conf.read(args.config)
     # build our configuration
     params = Parameters(conf)
     #pdb.set_trace()
-    pdb.set_trace()
-    conn = MySQLdb.connect(
-        user=params.user,
-        passwd=params.pwd,
-        db=params.db
-        )
-    cur = conn.cursor()
+    #pdb.set_trace()
+    conn, cur = create_db_and_new_tables(params.db)
+    sys.exit()
     # crank out a new table for the data
     createSeqTable(cur)
     conn.commit()
