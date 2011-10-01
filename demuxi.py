@@ -371,37 +371,6 @@ def get_sequence_count(input):
     lines = handle.read().count('>')
     handle.close()
     return lines
-            
-
-def qualOnlyWorker(sequence, qual, conf):
-    # we need a separate connection for each mysql cursor or they are going
-    # start going into locking hell and things will go poorly. Creating a new 
-    # connection for each worker process is the easiest/laziest solution.
-    # Connection pooling (DB-API) didn't work so hot, but probably because 
-    # I'm slightly retarded.
-    conn = MySQLdb.connect(user=conf.get('Database','USER'), 
-        passwd=conf.get('Database','PASSWORD'), 
-        db=conf.get('Database','DATABASE'))
-    cur = conn.cursor()
-    # convert low-scoring bases to 'N'
-    untrimmed_len = len(sequence.seq)
-    qual_trimmed = qualTrimming(sequence, qual)
-    N_count = str(qual_trimmed.seq).count('N')
-    sequence = qual_trimmed
-    # pickle the sequence record, so we can store it as a BLOB in MySQL, we
-    # can thus recurrect it as a sequence object when we need it next.
-    sequence_pickle = cPickle.dumps(sequence,1)
-    cur.execute('''INSERT INTO sequence (name, n_count, untrimmed_len, 
-        seq_trimmed, trimmed_len, record) 
-        VALUES (%s,%s,%s,%s,%s,%s)''', 
-        (sequence.id, N_count, untrimmed_len, sequence.seq, len(sequence.seq), 
-        sequence_pickle))
-    #pdb.set_trace()
-    cur.close()
-    conn.commit()
-    # keep our connection load low
-    conn.close()
-    return
 
 def singleproc(job, results, params):
     for sequence in job:
