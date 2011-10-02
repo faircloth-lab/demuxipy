@@ -96,14 +96,11 @@ def matches(tag, seq_match_span, tag_match_span, allowed_errors):
         seq_match_span.count('-') > allowed_errors:
         return 0, 0
     else:
-        #pdb.set_trace()
         seq_array   = numpy.array(list(seq_match_span))
         tag_array   = numpy.array(list(tag_match_span))
         matches     = sum(seq_array == tag_array)
         error       = sum(seq_array != tag_array) + (len(tag) - \
             len(tag_match_span.replace('-','')))
-        # I didn't like the way that the original method at
-        # http://github.com/chapmanb/bcbb/tree/master treats gaps 
         return matches, error
 
 def smithWaterman(seq, tags, allowed_errors):
