@@ -44,19 +44,22 @@ from Bio import pairwise2
 
 
 def motd():
-    '''Startup info'''
+    """Print a welcome message """
     motd = '''
-    ##############################################################
-    #                     linker.py                              #
-    # Provides:                                                  #
-    #   - parsing and error correction of hierarchically tagged  #
-    #     next generation sequence reads                         #
-    #                                                            #
-    #                                                            #
-    # Copyright (c) 2009-2011 Brant C. Faircloth                 #
-    # 621 Charles E. Young Drive                                 #
-    # University of California, Los Angeles, 90095, USA          #
-    ##############################################################\n
+    ###############################################################
+    #                       demuxi.py                             #
+    #                                                             #
+    # Demultiplexing of hierarchically tagged, massively parallel #
+    # DNA sequence reads                                          #
+    #                                                             #
+    #                                                             #
+    # Copyright (c) 2009-2011 Brant C. Faircloth                  #
+    #                                                             #
+    #                                                             #
+    # Ecology and Evolutionary Biology                            #
+    # 621 Charles E. Young Drive                                  #
+    # University of California, Los Angeles, 90095, USA           #
+    ###############################################################\n
     '''
     print motd
 
