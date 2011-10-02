@@ -370,7 +370,7 @@ def singleproc(job, results, params):
 
         # check for concatemers
         if params.concat and len(tagged.read.sequence) > 0:
-            tagged = concatCheck(tagged, all_tags, all_tags_regex,
+            tagged = concatCheck(tagged, all_tags, params.all_tags_regex,
                         reverse_linkers, params.fuzzy)
         
         results.put(tagged)
@@ -383,67 +383,6 @@ def multiproc(jobs, results, params):
         if job is None:
             break
         _ = singleproc(job, results, params)
-    """#pdb.set_trace()
-    tags = params.tags
-    if params.midTrim:
-        # search on 5' (left) end for MID
-        mid = midTrim(seqRecord.sequence, params.tags, params.midGap, params.mid_len, params.fuzzy, params.allowed_errors)
-        if mid:
-            # if MID, search for exact matches (for and revcomp) on Linker
-            # provided no exact matches, use fuzzy matching (Smith-Waterman) +
-            # error correction to find Linker
-            seqRecord.mid           = mid[0]
-            seqRecord.sequence      = mid[1]
-            seqRecord.seq_match     = mid[2]
-            seqRecord.m_type        = mid[3]
-            seqRecord.reverse_mid   = params.reverse_mid[seqRecord.mid]
-            tags                    = params.tags[seqRecord.mid]
-    #pdb.set_trace()
-    if params.linkerTrim:
-        linker = linkerTrim(seqRecord.sequence, tags, params.linkerGap,
-            params.mid_len, params.fuzzy, params.allowed_errors)
-        if linker:
-            if linker[0]:
-                seqRecord.l_tag             = linker[0]
-                seqRecord.sequence          = linker[1]
-                seqRecord.l_seq_match       = linker[2]
-                seqRecord.l_critter         = linker[3]
-                seqRecord.l_m_type          = linker[4]
-                seqRecord.reverse_linker    = params.reverse_linkers[seqRecord.l_tag]
-            # deal with tag-mismatch
-            if not linker[0] and linker[4]:
-                seqRecord.l_m_type          = linker[4]
-    # check for concatemers
-    if params.concat:
-        if l_trimmed and len(l_trimmed.seq) > 0:
-            concat_tag, concat_type, concat_seq_match = concatCheck(l_trimmed, 
-                all_tags, all_tags_regex, reverse_linkers, fuzzy=params.fuzzy)
-        else:
-            concat_tag, concat_type, concat_seq_match = None, None, None
-    else:
-        concat_tag, concat_type, concat_seq_match = None, None, None
-    # pickle the sequence record, so we can store it as a BLOB in MySQL, we
-    # can thus resurrect it as a sequence object when we need it next.
-    sequence_pickle = cPickle.dumps(seqRecord.sequence,1)
-    cur.execute('''INSERT INTO sequence (name, mid, mid_seq, mid_match, 
-        mid_method, linker, linker_seq, linker_match, linker_method, cluster, 
-        concat_seq, concat_match, concat_method, n_count, untrimmed_len, 
-        seq_trimmed, trimmed_len, record) 
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''', 
-        (seqRecord.sequence.id, seqRecord.reverse_mid, seqRecord.mid, \
-        seqRecord.seq_match, seqRecord.m_type, seqRecord.reverse_linker, \
-        seqRecord.l_tag, seqRecord.l_seq_match, seqRecord.l_m_type, \
-        seqRecord.l_critter, seqRecord.concat_tag, \
-        seqRecord.concat_seq_match, seqRecord.concat_type, seqRecord.nCount, \
-        len(seqRecord.unmod.seq), seqRecord.sequence.seq, \
-        len(seqRecord.sequence.seq), sequence_pickle))
-    #pdb.set_trace()
-    cur.close()
-    conn.commit()
-    # keep our connection load low
-    conn.close()
-    return
-    """
 
 def get_args():
     """get arguments (config file location)"""
