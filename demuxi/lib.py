@@ -171,7 +171,7 @@ class Tagged():
         self.l_m_type           = None
         self.reverse_linker     = None
         self.concat_tag         = None
-        self.concat_type        = None
+        self.concat_m_type      = None
         self.concat_seq_type    = None
         self.concat_count       = None
         self.concat_seq_match   = None
