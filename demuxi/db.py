@@ -24,29 +24,33 @@ def create_db_and_new_tables(db_name):
     cur.execute("PRAGMA foreign_keys = ON")
     try:
         cur.execute('''CREATE TABLE tags (
-            id integer PRIMARY KEY AUTOINCREMENT,
-            name text,
-            mid text,
-            mid_seq text,
-            mid_match text,
-            mid_method text,
-            linker text,
-            linker_seq text,
-            linker_match text,
-            linker_method text,
-            cluster text,
-            concat_seq text,
-            concat_match text,
-            concat_method text)''')
+                id integer PRIMARY KEY AUTOINCREMENT,
+                name text,
+                id text,
+                mid_seq text,
+                mid_match text,
+                mid_method text,
+                linker text,
+                linker_seq text,
+                linker_match text,
+                linker_method text,
+                cluster text,
+                concat_seq text,
+                concat_match text,
+                concat_method text
+            )'''
+        )
         cur.execute('''CREATE TABLE sequence (
-            id INTEGER,
-            untrimmed_len integer,
-            trimmed_len integer,
-            n_count integer,
-            seq_trimmed text,
-            record blob,
-            FOREIGN KEY(id) REFERENCES tags(id) DEFERRABLE INITIALLY
-            DEFERRED)''')
+                id INTEGER,
+                untrimmed_len integer,
+                trimmed_len integer,
+                n_count integer,
+                seq_trimmed text,
+                record blob,
+                FOREIGN KEY(id) REFERENCES tags(id) DEFERRABLE INITIALLY
+                DEFERRED
+            )'''
+        )
         cur.execute("CREATE INDEX idx_sequence_cluster on tags(cluster)")
     except sqlite3.OperationalError, e:
         #pdb.set_trace()
@@ -64,9 +68,21 @@ def create_db_and_new_tables(db_name):
 
 def insert_record_to_db(cur, tagged):
     name = tagged.read.identifier.split(' ')[0].lstrip('>')
-    cur.execute('''INSERT INTO tags (name, mid, mid_seq, mid_match, 
-        mid_method, linker, linker_seq, linker_match, linker_method, cluster, 
-        concat_seq, concat_match, concat_method) 
+    cur.execute('''INSERT INTO tags (
+            name,
+            mid,
+            mid_seq,
+            mid_match,
+            mid_method,
+            linker,
+            linker_seq,
+            linker_match,
+            linker_method,
+            cluster,
+            concat_seq,
+            concat_match,
+            concat_method
+        ) 
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''', 
         (
             name,
@@ -87,8 +103,14 @@ def insert_record_to_db(cur, tagged):
     key = cur.lastrowid
     # pick the actual sequence
     sequence_pickle = pickle.dumps(tagged.read,1)
-    cur.execute('''INSERT INTO sequence (id, trimmed_len,
-        n_count, seq_trimmed, record) VALUES (?,?,?,?,?)''',
+    cur.execute('''INSERT INTO sequence (
+            id,
+            trimmed_len,
+            n_count,
+            seq_trimmed,
+            record
+        ) 
+        VALUES (?,?,?,?,?)''',
         (
             key,
             len(tagged.read.sequence),
