@@ -78,16 +78,6 @@ def revCompTags(tags):
         revTags[revComp(tag)] = tags[tag]
     return revTags
 
-def trim(sequence, left=None, right=None):
-    '''Trim a given sequence given left and right offsets'''
-    if left and right:
-        sequence = sequence[left:right]
-    elif left:
-        sequence = sequence[left:]
-    elif right:
-        sequence = sequence[:right]
-    return sequence
-
 def matches(tag, seq_match_span, tag_match_span, allowed_errors):
     '''Determine the gap/error counts for a particular match'''
     # deal with case where tag match might be perfect, but extremely gappy, 
