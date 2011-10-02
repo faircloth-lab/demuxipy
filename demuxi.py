@@ -253,6 +253,34 @@ def linkerTrim(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
     
     return tagged
 
+def concatCheck(tagged, all_tags, all_tags_regex, reverse_linkers, fuzzy):
+    '''Check screened sequence for the presence of concatemers by scanning 
+    for all possible tags - after the 5' and 3' tags have been removed'''
+    s = str(sequence.seq)
+    m_type = None
+    # do either/or to try and keep speed up, somewhat
+    #if not kwargs['fuzzy']:
+    #pdb.set_trace()
+    for tag in all_tags_regex:
+        match = re.search(tag, s)
+        if match:
+            tag = tag.pattern
+            m_type = 'regex-concat'
+            seq_match = tag
+            break
+    if not match and ['fuzzy']:
+    #else:
+        match = align(s, all_tags, 1)
+        # we can trim w/o regex
+        if match:
+            tag = match[0]
+            m_type = 'fuzzy-concat'
+            seq_match = match[3]
+    if m_type:
+        return tag, m_type, seq_match
+    else:
+        return None, None, None
+
 def reverse(items, null=False):
     '''build a reverse dictionary from a list of tuples'''
     l = []
@@ -307,34 +335,6 @@ def create_db_and_new_tables(db_name):
             raise sqlite3.OperationalError, e
     return conn, cur
 
-def concatCheck(sequence, all_tags, all_tags_regex, reverse_linkers, **kwargs):
-    '''Check screened sequence for the presence of concatemers by scanning 
-    for all possible tags - after the 5' and 3' tags have been removed'''
-    s = str(sequence.seq)
-    m_type = None
-    # do either/or to try and keep speed up, somewhat
-    #if not kwargs['fuzzy']:
-    #pdb.set_trace()
-    for tag in all_tags_regex:
-        match = re.search(tag, s)
-        if match:
-            tag = tag.pattern
-            m_type = 'regex-concat'
-            seq_match = tag
-            break
-    if not match and ['fuzzy']:
-    #else:
-        match = align(s, all_tags, 1)
-        # we can trim w/o regex
-        if match:
-            tag = match[0]
-            m_type = 'fuzzy-concat'
-            seq_match = match[3]
-    if m_type:
-        return tag, m_type, seq_match
-    else:
-        return None, None, None
-
 def get_sequence_count(input):
     '''Determine the number of sequence reads in the input'''
     return sum([1 for line in open(input, 'rU') if line.startswith('>')])
@@ -348,11 +348,15 @@ def singleproc(job, results, params):
         if params.qual_trim:
             #pdb.set_trace()
             tagged.read = tagged.read.trim(params.min_qual, False)
+
+        # check for MIDs
         if params.mid_trim:
             tagged = mid_trim(tagged, params.tags, params.mid_gap, \
                     params.mid_len, params.fuzzy, params.allowed_errors)
             if tagged.mid:
                 tagged.reverse_mid = params.reverse_mid[tagged.mid]
+
+        # check for linkers
         if params.linker_trim:
             # if we never trimmed the MID, then the tags are in 
             # the param object
@@ -367,12 +371,17 @@ def singleproc(job, results, params):
             else:
                 tags = None
             if tags:
-                linker = linkerTrim(tagged, tags, params.linker_gap,
+                tagged = linkerTrim(tagged, tags, params.linker_gap,
                             params.linker_len, params.fuzzy, params.allowed_errors)
                 if tagged.l_tag:
                     tagged.reverse_linker = params.reverse_linkers[tagged.l_tag]
-        if tagged:
-            results.put(tagged)
+
+        # check for concatemers
+        if params.concat and len(tagged.read.sequence) > 0:
+            tagged = concatCheck(tagged, all_tags, all_tags_regex,
+                        reverse_linkers, params.fuzzy)
+        
+        results.put(tagged)
     return results
 
 def multiproc(jobs, results, params):
@@ -540,8 +549,7 @@ def main():
         #for unit in xrange(num_reads):
         for unit in xrange(18):
             #enter_to_db(results.get())
-            o = results.get()
-            print o.mid, o.l_tag
+            insert_record_to_db(cur, results.get())
             results.task_done()
         # make sure we put None at end of Queue
         # in an amount equiv. to num_procs
