@@ -39,6 +39,7 @@ from multiprocessing import Process, Queue, JoinableQueue, cpu_count
 
 from tools.sequence.fasta import FastaQualityReader
 from demuxi.lib import FullPaths, ListQueue, Tagged, Parameters
+from demuxi import db
 
 from Bio import pairwise2
 
@@ -283,50 +284,6 @@ def reverse(items, null=False):
         l.append(t)
     return dict(l)
 
-def create_db_and_new_tables(db_name):
-    conn = sqlite3.connect(db_name)
-    cur = conn.cursor()
-    cur.execute("PRAGMA foreign_keys = ON")
-    try:
-        cur.execute('''CREATE TABLE tags (
-            id integer PRIMARY KEY AUTOINCREMENT,
-            name text,
-            mid text,
-            mid_seq text,
-            mid_match text,
-            mid_method text,
-            linker text,
-            linker_seq text,
-            linker_match text,
-            linker_method text,
-            cluster text,
-            concat_seq text,
-            concat_match text,
-            concat_method text)''')
-        cur.execute('''CREATE TABLE sequence (
-            id INTEGER,
-            untrimmed_len integer,
-            trimmed_len integer,
-            n_count integer,
-            seq_trimmed text,
-            record blob,
-            FOREIGN KEY(id) REFERENCES tags(id) DEFERRABLE INITIALLY
-            DEFERRED)''')
-        cur.execute("CREATE INDEX idx_sequence_cluster on tags(cluster)")
-    except sqlite3.OperationalError, e:
-        #pdb.set_trace()
-        if "already exists" in e[0]:
-            answer = raw_input("\n\tDatabase already exists.  Overwrite [Y/n]? ")
-            #pdb.set_trace()
-            if answer == "Y" or answer == "YES":
-                os.remove(db_name)
-                conn, cur = create_db_and_new_tables(db_name)
-            else:
-                sys.exit()
-        else:
-            raise sqlite3.OperationalError, e
-    return conn, cur
-
 def get_sequence_count(input):
     """Determine the number of sequence reads in the input"""
     return sum([1 for line in open(input, 'rU') if line.startswith('>')])
@@ -372,7 +329,7 @@ def singleproc(job, results, params):
         if params.concat and len(tagged.read.sequence) > 0:
             tagged = concat_check(tagged, all_tags, params.all_tags_regex,
                         reverse_linkers, params.fuzzy)
-        
+
         results.put(tagged)
     return results
 
@@ -402,42 +359,6 @@ def split_reads_into_groups(fasta, qual, num_reads, num_procs):
         yield chunk
         chunk = list(itertools.islice(i, job_size))
 
-def insert_record_to_db(cur, tagged):
-    name = tagged.read.identifier.split(' ')[0].lstrip('>')
-    cur.execute('''INSERT INTO tags (name, mid, mid_seq, mid_match, 
-        mid_method, linker, linker_seq, linker_match, linker_method, cluster, 
-        concat_seq, concat_match, concat_method) 
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''', 
-        (
-            name,
-            tagged.reverse_mid,
-            tagged.mid,
-            tagged.seq_match,
-            tagged.m_type,
-            tagged.reverse_linker,
-            tagged.l_tag,
-            tagged.l_seq_match,
-            tagged.l_m_type,
-            tagged.l_critter,
-            tagged.concat_tag,
-            tagged.concat_seq_match,
-            tagged.concat_type
-        )
-    )
-    key = cur.lastrowid
-    # pick the actual sequence
-    sequence_pickle = cPickle.dumps(tagged.read,1)
-    cur.execute('''INSERT INTO sequence (id, trimmed_len,
-        n_count, seq_trimmed, record) VALUES (?,?,?,?,?)''',
-        (
-            key,
-            len(tagged.read.sequence),
-            tagged.read.sequence.lower().count('n'),
-            tagged.read.sequence,
-            sequence_pickle
-        )
-    )
-
 def main():
     """Main loop"""
     start_time = time.time()
@@ -450,7 +371,7 @@ def main():
     params = Parameters(conf)
     # create the db and tables, returninn connection
     # and cursor
-    conn, cur = create_db_and_new_tables(params.db)
+    conn, cur = db.create_db_and_new_tables(params.db)
     # get read count of input
     num_reads = get_sequence_count(params.fasta)
     if params.num_procs > 1:
@@ -480,7 +401,7 @@ def main():
         #for unit in xrange(num_reads):
         for unit in xrange(18):
             #enter_to_db(results.get())
-            insert_record_to_db(cur, results.get())
+            db.insert_record_to_db(cur, results.get())
             results.task_done()
         # make sure we put None at end of Queue
         # in an amount equiv. to num_procs
@@ -496,14 +417,14 @@ def main():
         results = ListQueue()
         singleproc(work, results, params)
         for tagged in results:
-            insert_record_to_db(cur, tagged)
+            db.insert_record_to_db(cur, tagged)
     print '\n'
     conn.commit()
     cur.close()
     conn.close()
     end_time = time.time()
     print 'Ended: ', time.strftime("%a %b %d, %Y  %H:%M:%S", time.localtime(end_time))
-    print '\nTime for execution: ', (end_time - start_time)/60, 'minutes'
+    print '\nTime for execution: ', round((end_time - start_time)/60, 2), 'minutes'
 
 if __name__ == '__main__':
     main()
