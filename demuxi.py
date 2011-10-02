@@ -253,33 +253,25 @@ def linkerTrim(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
     
     return tagged
 
-def concatCheck(tagged, all_tags, all_tags_regex, reverse_linkers, fuzzy):
+def concatCheck(tagged, all_tags, all_tags_regex, reverse_linkers, fuzzy, errors = 1):
     '''Check screened sequence for the presence of concatemers by scanning 
     for all possible tags - after the 5' and 3' tags have been removed'''
-    s = str(sequence.seq)
+    s = tagged.read.sequence
     m_type = None
-    # do either/or to try and keep speed up, somewhat
-    #if not kwargs['fuzzy']:
-    #pdb.set_trace()
     for tag in all_tags_regex:
-        match = re.search(tag, s)
+        match = tag.search(s)
         if match:
-            tag = tag.pattern
-            m_type = 'regex-concat'
-            seq_match = tag
+            tagged.concat_tag= tag.pattern
+            tagged.concat_m_type = 'regex-concat'
+            tagged.seq_match = tag
             break
     if not match and ['fuzzy']:
-    #else:
-        match = align(s, all_tags, 1)
-        # we can trim w/o regex
+        match = align(s, all_tags, errors)
         if match:
-            tag = match[0]
-            m_type = 'fuzzy-concat'
-            seq_match = match[3]
-    if m_type:
-        return tag, m_type, seq_match
-    else:
-        return None, None, None
+            tagged.concat_tag = match[0]
+            tagged.concat_m_type = 'fuzzy-concat'
+            tagged.seq_match = match[3]
+    return tagged
 
 def reverse(items, null=False):
     '''build a reverse dictionary from a list of tuples'''
