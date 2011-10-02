@@ -136,23 +136,6 @@ def smithWaterman(seq, tags, allowed_errors):
     else:
         return None
 
-def qualTrimming(sequence, min_score=10):
-    '''Remove ambiguous bases from 5' and 3' sequence ends'''
-    s = str(sequence.seq)
-    sl = list(s)
-    for q in enumerate(sequence.letter_annotations["phred_quality"]):
-        if q[1] < min_score:
-            sl[q[0]] = 'N'
-    s = ''.join(sl)
-    # find runs of ambiguous bases at 5' and 3' ends
-    left_re, right_re = re.compile('^N+'),re.compile('N+$')
-    left_trim, right_trim = re.search(left_re, s), re.search(right_re, s)
-    if left_trim:
-        left_trim = left_trim.end()
-    if right_trim:
-        right_trim = right_trim.end()
-    return trim(sequence, left_trim, right_trim)
-
 def mid_trim(tagged, tags, max_gap_char, mid_len, fuzzy, errors):
     """Remove the MID tag from the sequence read"""
     #if sequence.id == 'MID_No_Error_ATACGACGTA':
