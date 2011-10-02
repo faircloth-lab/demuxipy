@@ -211,11 +211,11 @@ def find_and_trim_linkers(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
     left = find_left_linker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
     right = find_right_linker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
 
-    # we can have 3 types of matches - tags on left and right sides,
+    # we can have 5 types of matches - tags on left and right sides,
     # tags on left side only, tags on right side only, mismatching tags
     # and no tags at all.  We take care of matching position (i,e. we
     # want only matches at the ends) by regex and slicing in the
-    # search methods above.  If for some reason we want to check
+    # search methods above.  If for some reason you want to check
     # for concatemers, then turn that function on.
     if left is not None \
             and right is not None \
