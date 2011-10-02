@@ -38,11 +38,11 @@ class Parameters():
     '''linkers.py run parameters'''
     def __init__(self, conf):
         self.conf = conf
-        try:
-            self.fasta        = self.conf.get('Input','fasta')
-            self.quality      = self.conf.get('Input','quality')
-        except:
-            self.fastq       = self.conf.geet('Input','fastq')
+        #try:
+        self.fasta        = self.conf.get('Input','fasta')
+        self.quality      = self.conf.get('Input','quality')
+        #except:
+        #    self.fastq       = self.conf.get('Input','fastq')
         self.db              = self.conf.get('Database','DATABASE')
         self.qual_trim       = self.conf.getboolean('Steps', 'QualTrim')
         self.min_qual         = self.conf.getint('GeneralParameters', 'MinQualScore')

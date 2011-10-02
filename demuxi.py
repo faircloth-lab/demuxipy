@@ -160,11 +160,9 @@ def mid_trim(tagged, tags, max_gap_char, mid_len, fuzzy, errors):
     mid = leftLinker(tagged.read.sequence, tags, max_gap_char, mid_len, fuzzy,
         errors, gaps = True)
     if mid:
-        tagged.mid, tagged.mid_match, tagged_mid_type = mid[0],mid[1],mid[4]
+        tagged.mid, tagged.m_type, tagged.seq_match = mid[0],mid[1],mid[4]
         tagged.read = tagged.read.slice(mid[3],len(tagged.read.sequence), False)
-        return tagged
-    else:
-        return None
+    return tagged
 
 def SWMatchPos(seq_match_span, start, stop):
     # slice faster than ''.startswith()
@@ -174,7 +172,7 @@ def SWMatchPos(seq_match_span, start, stop):
         stop = stop - seq_match_span.count('-')
     return start, stop
 
-def leftLinker(s, tags, max_gap_char, mid_len, fuzzy, errors, gaps=False):
+def leftLinker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
     '''Matching methods for left linker - regex first, followed by fuzzy (SW)
     alignment, if the option is passed'''
     for tag in tags:
@@ -189,10 +187,8 @@ def leftLinker(s, tags, max_gap_char, mid_len, fuzzy, errors, gaps=False):
             # by default, this is true
             seq_match = tag
             break
-    #if s == 'ACCTCGTGCGGAATCGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAGAG':
-    #    pdb.set_trace()
     if not match and fuzzy:
-        match = smithWaterman(s[:max_gap_char + mid_len], tags, errors)
+        match = smithWaterman(s[:max_gap_char + tag_len], tags, errors)
         # we can trim w/o regex
         if match:
             m_type = 'fuzzy'
@@ -204,7 +200,7 @@ def leftLinker(s, tags, max_gap_char, mid_len, fuzzy, errors, gaps=False):
     else:
         return None
 
-def rightLinker(s, tags, max_gap_char, mid_len, fuzzy, errors, gaps=False):
+def rightLinker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
     '''Mathing methods for right linker - regex first, followed by fuzzy (SW)
     alignment, if the option is passed'''
     revtags = revCompTags(tags)
@@ -221,7 +217,7 @@ def rightLinker(s, tags, max_gap_char, mid_len, fuzzy, errors, gaps=False):
             seq_match = tag
             break
     if not match and fuzzy:
-        match = smithWaterman(s[-(mid_len + max_gap_char):], revtags, errors)
+        match = smithWaterman(s[-(tag_len + max_gap_char):], revtags, errors)
         # we can trim w/o regex
         if match:
             m_type = 'fuzzy'
@@ -233,51 +229,61 @@ def rightLinker(s, tags, max_gap_char, mid_len, fuzzy, errors, gaps=False):
     else:
         return None
 
-def linkerTrim(sequence, tags, max_gap_char, mid_len, fuzzy, errors):
+def both_tags_within_gaps(sequence, left, right, max_gap):
+    if left[2] <= max_gap and \
+                right[2] >= (len(sequence) - (len(right[0]) + max_gap)):
+        return True
+
+def linkerTrim(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
     '''Use regular expression and (optionally) fuzzy string matching
     to locate and trim linkers from sequences'''
-    m_type  = False
-    left    = leftLinker(sequence, tags, max_gap_char, mid_len, fuzzy, errors)
-    right   = rightLinker(sequence, tags, max_gap_char, mid_len, fuzzy, errors)
-    s = str(sequence.seq)
-    if left and right and left[0] == right[0]:
-        # we can have lots of conditional matches here
-        if left[2] <= max_gap_char and right[2] >= (len(s) - (len(right[0]) +\
-        max_gap_char)):
-            trimmed = trim(sequence, left[3], right[2])
-            # left and right are identical so largely pass back the left
-            # info... except for m_type which can be a combination
-            tag, m_type, seq_match = left[0], left[1]+'-'+right[1]+'-both', \
-            left[4]
-        else:
-            pass
-    elif left and right and left[0] != right[0]:
-        # flag
-        if left[2] <= max_gap_char and right[2] >= (len(s) - (len(right[0]) +\
-        max_gap_char)):
-            trimmed = None
-            tag, m_type, seq_match = None, 'tag-mismatch', None
-    elif left:
-        if left[2] <= max_gap_char:
-            trimmed = trim(sequence, left[3])
-            tag, m_type, seq_match = left[0], left[1]+'-left', left[4]
-        else:
-            # flag
-            pass
-    elif right:
-        if right[2] >= (len(s) - (len(right[0]) + max_gap_char)):
-            trimmed = trim(sequence, None, right[2])
-            tag, m_type, seq_match = right[0], right[1]+'-right', right[4]
-        else:
-            # flag
-            pass
-    if m_type:
-        try:
-            return tag, trimmed, seq_match, tags[tag], m_type
-        except:
-            return tag, trimmed, seq_match, None, m_type
+
+    left = leftLinker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
+    right = rightLinker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
+    
+    # we can have 3 types of matches - tags on left and right sides,
+    # tags on left side only, tags on right side only, mismatching tags
+    # and no tags at all
+    if left is not None \
+            and right is not None \
+            and left[0] == right[0] and \
+            both_tags_within_gaps(tagged.read.sequence, left, right, max_gap_char):
+        # trim the read
+        tagged.read = tagged.read.slice(left[3], right[2], False)
+        # left and right are identical so largely pass back the left
+        # info... except for m_type which can be a combination
+        tagged.l_tag, tagged.l_seq_match = left[0], left[4]
+        tagged.l_m_type = "{}-{}-both".format(left[1], right[1])
+        tagged.l_critter = tags[tagged.l_tag]
+
+    elif left and right \
+            and left[0] != right[0] \
+            and both_tags_within_gaps(tagged.read.sequence, left, right, max_gap_char):
+        # these are no good.  check for within gaps
+        # to make sure it's not a spurious match
+        tagged.trimmed = None
+        tagged.l_tag, tagged.l_seq_match = None, None
+        tagged.l_m_type = "tag-mismatch"
+        tagged.l_critter = None
+
+    elif left and left[2] <= max_gap_char:
+        tagged.read = tagged.read.slice(left[3], len(tagged.read.sequence), False)
+        tagged.l_tag, tagged.l_seq_match = left[0], left[4]
+        tagged.l_seq_match = "{}-left".format(left[1])
+        tagged.l_critter = tags[tagged.l_tag]
+
+    elif right and right[2] >= (len(s) - (len(right[0]) + max_gap_char)):
+        tagged.read = tagged.read.slice(0, right[2], False)
+        tagged.l_tag, tagged.l_seq_match = right[0], right[4]
+        tagged.l_m_type = "{}-right".format(right[1])
+        tagged.l_critter = tags[tagged.l_tag]
+
     else:
-        return None
+        trimmed = None
+        tagged.l_tag, tagged.l_m_type, tagged.l_seq_match = None, None, None
+        tagged.l_critter = None
+    
+    return tagged
 
 def reverse(items, null=False):
     '''build a reverse dictionary from a list of tuples'''
@@ -374,6 +380,8 @@ def get_sequence_count(input):
 
 def singleproc(job, results, params):
     for sequence in job:
+        # set tags = empty
+        tags = None
         # for now, we'll keep this here
         tagged = Tagged(sequence)
         if params.qual_trim:
@@ -382,15 +390,28 @@ def singleproc(job, results, params):
         if params.mid_trim:
             tagged = mid_trim(tagged, params.tags, params.mid_gap, \
                     params.mid_len, params.fuzzy, params.allowed_errors)
-            #if mid:
-            #    tag.mid, tag.sequence, tag.seq_match, tag.m_type,
-            #        tag.reverse_mid, tags =
-            #        mid[0], mid[1], mid[2], mid[3],
-            #        params.reverse_mid[seqRecord.mid], params.tags[seqRecord.mid]
-
+            if tagged.mid:
+                tagged.reverse_mid = params.reverse_mid[tagged.mid]
+        if params.linker_trim:
+            # if we never trimmed the MID, then the tags are in 
+            # the param object
+            if not params.mid_trim:
+                tags = params.tags
+            # if we're tagging hierarchically, then we should get a
+            # mid.
+            elif tagged.mid is not None:
+                # reduce out list of possible tags to only those that
+                # that go w/ this particular MID
+                tags = params.tags[tagged.mid]
+            else:
+                tags = None
+            if tags:
+                linker = linkerTrim(tagged, tags, params.linker_gap,
+                            params.linker_len, params.fuzzy, params.allowed_errors)
+                if tagged.l_tag:
+                    tagged.reverse_linker = params.reverse_linkers[tagged.l_tag]
         if tagged:
             results.put(tagged)
-            pdb.set_trace()
     return results
 
 def multiproc(jobs, results, params):
@@ -522,8 +543,8 @@ def main():
         #for unit in xrange(num_reads):
         for unit in xrange(18):
             #enter_to_db(results.get())
-            r = results.get()
-            print r.unmod
+            o = results.get()
+            print o.mid, o.l_tag
             results.task_done()
         # make sure we put None at end of Queue
         # in an amount equiv. to num_procs
@@ -538,9 +559,8 @@ def main():
     else:
         results = ListQueue()
         singleproc(work, results, params)
-        for r in results:
-            print r.unmod
-
+        for o in results:
+            print o.read.identifier, o.m_type, o.l_m_type
     
     print '\n'
     cur.close()
