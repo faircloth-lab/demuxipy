@@ -51,7 +51,7 @@ def create_db_and_new_tables(db_name):
     except sqlite3.OperationalError, e:
         #pdb.set_trace()
         if "already exists" in e[0]:
-            answer = raw_input("\n\tDatabase already exists.  Overwrite [Y/n]? ")
+            answer = raw_input("\nDatabase already exists.  Overwrite [Y/n]? ")
             #pdb.set_trace()
             if answer == "Y" or answer == "YES":
                 os.remove(db_name)
