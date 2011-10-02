@@ -45,7 +45,7 @@ from Bio import pairwise2
 
 def motd():
     """Print a welcome message """
-    motd = '''
+    motd = """
     ###############################################################
     #                       demuxi.py                             #
     #                                                             #
@@ -60,24 +60,24 @@ def motd():
     # 621 Charles E. Young Drive                                  #
     # University of California, Los Angeles, 90095, USA           #
     ###############################################################\n
-    '''
+    """
     print motd
 
 def revComp(seq):
-    '''Return reverse complement of seq'''
+    """Return reverse complement of seq"""
     bases = string.maketrans('AGCTagct','TCGAtcga')
     # translate it, reverse, return
     return seq.translate(bases)[::-1]
 
 def revCompTags(tags):
-    '''Return the reverse complements of a tag dictionary'''
+    """Return the reverse complements of a tag dictionary"""
     revTags = {}
     for tag in tags:
         revTags[revComp(tag)] = tags[tag]
     return revTags
 
 def matches(tag, seq_match_span, tag_match_span, allowed_errors):
-    '''Determine the gap/error counts for a particular match'''
+    """Determine the gap/error counts for a particular match"""
     # deal with case where tag match might be perfect, but extremely gappy, 
     # e.g. ACGTCGTGCGGA-------------------------ATC
     if tag_match_span.count('-') > allowed_errors or \
@@ -92,9 +92,9 @@ def matches(tag, seq_match_span, tag_match_span, allowed_errors):
         return matches, error
 
 def align(seq, tags, allowed_errors):
-    '''Alignment method for aligning tags with their respective
+    """Alignment method for aligning tags with their respective
     sequences.  Only called when regular expression matching patterns fail.
-    Inspired by http://github.com/chapmanb/bcbb/tree/master'''
+    Inspired by http://github.com/chapmanb/bcbb/tree/master"""
     high_score = {'tag':None, 'seq_match':None, 'mid_match':None, 'score':None, 
         'start':None, 'end':None, 'matches':None, 'errors':allowed_errors}
     for tag in tags:
@@ -141,8 +141,8 @@ def get_align_match_position(seq_match_span, start, stop):
     return start, stop
 
 def find_left_linker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
-    '''Matching methods for left linker - regex first, followed by fuzzy (SW)
-    alignment, if the option is passed'''
+    """Matching methods for left linker - regex first, followed by fuzzy (SW)
+    alignment, if the option is passed"""
     for tag in tags:
         if gaps:
             regex = re.compile(('^%s') % (tag))
@@ -169,8 +169,8 @@ def find_left_linker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
         return None
 
 def find_right_linker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
-    '''Mathing methods for right linker - regex first, followed by fuzzy (SW)
-    alignment, if the option is passed'''
+    """Mathing methods for right linker - regex first, followed by fuzzy (SW)
+    alignment, if the option is passed"""
     revtags = revCompTags(tags)
     for tag in revtags:
         if gaps:
@@ -203,8 +203,8 @@ def both_tags_within_gaps(sequence, left, right, max_gap):
         return True
 
 def find_and_trim_linkers(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
-    '''Use regular expression and (optionally) fuzzy string matching
-    to locate and trim linkers from sequences'''
+    """Use regular expression and (optionally) fuzzy string matching
+    to locate and trim linkers from sequences"""
 
     left = find_left_linker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
     right = find_right_linker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
@@ -254,8 +254,8 @@ def find_and_trim_linkers(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
     return tagged
 
 def concat_check(tagged, all_tags, all_tags_regex, reverse_linkers, fuzzy, errors = 1):
-    '''Check screened sequence for the presence of concatemers by scanning 
-    for all possible tags - after the 5' and 3' tags have been removed'''
+    """Check screened sequence for the presence of concatemers by scanning 
+    for all possible tags - after the 5' and 3' tags have been removed"""
     s = tagged.read.sequence
     m_type = None
     for tag in all_tags_regex:
@@ -274,7 +274,7 @@ def concat_check(tagged, all_tags, all_tags_regex, reverse_linkers, fuzzy, error
     return tagged
 
 def reverse(items, null=False):
-    '''build a reverse dictionary from a list of tuples'''
+    """build a reverse dictionary from a list of tuples"""
     l = []
     if null:
         items += ((None, None),)
@@ -328,7 +328,7 @@ def create_db_and_new_tables(db_name):
     return conn, cur
 
 def get_sequence_count(input):
-    '''Determine the number of sequence reads in the input'''
+    """Determine the number of sequence reads in the input"""
     return sum([1 for line in open(input, 'rU') if line.startswith('>')])
 
 def singleproc(job, results, params):
@@ -439,7 +439,7 @@ def insert_record_to_db(cur, tagged):
     )
 
 def main():
-    '''Main loop'''
+    """Main loop"""
     start_time = time.time()
     motd()
     args = get_args()
