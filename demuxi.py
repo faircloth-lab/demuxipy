@@ -53,7 +53,7 @@ def motd():
     #     next generation sequence reads                         #
     #                                                            #
     #                                                            #
-    # Copyright (c) 2009-2010 Brant C. Faircloth                 #
+    # Copyright (c) 2009-2011 Brant C. Faircloth                 #
     # 621 Charles E. Young Drive                                 #
     # University of California, Los Angeles, 90095, USA          #
     ##############################################################\n
