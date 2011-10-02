@@ -373,10 +373,7 @@ def concatCheck(sequence, all_tags, all_tags_regex, reverse_linkers, **kwargs):
 
 def get_sequence_count(input):
     '''Determine the number of sequence reads in the input'''
-    handle = open(input, 'rU')
-    lines = handle.read().count('>')
-    handle.close()
-    return lines
+    return sum([1 for line in open(input, 'rU') if line.startswith('>')])
 
 def singleproc(job, results, params):
     for sequence in job:
