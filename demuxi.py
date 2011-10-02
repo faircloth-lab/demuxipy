@@ -44,9 +44,7 @@ from tools.sequence.fasta import FastaQualityReader
 from demuxi.lib import FullPaths, ListQueue, Tagged, Parameters
 
 from Bio import pairwise2
-from Bio.SeqIO import QualityIO
-from Bio.SeqRecord import SeqRecord
-from Bio.Alphabet import SingleLetterAlphabet
+
 
 def motd():
     '''Startup info'''
