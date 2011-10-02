@@ -439,7 +439,7 @@ def main():
     end_time = time.time()
     pretty_end_time = time.strftime("%a %b %d, %Y  %H:%M:%S", time.localtime(end_time))
     print "Ended: {} (run time {} minutes)".format(pretty_end_time,
-            round((end_time - start_time)/60, 2))
+            round((end_time - start_time)/60, 3))
 
 if __name__ == '__main__':
     main()
