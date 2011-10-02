@@ -125,7 +125,7 @@ def mid_trim(tagged, tags, max_gap_char, mid_len, fuzzy, errors):
     """Remove the MID tag from the sequence read"""
     #if sequence.id == 'MID_No_Error_ATACGACGTA':
     #    pdb.set_trace()
-    mid = leftLinker(tagged.read.sequence, tags, max_gap_char, mid_len, fuzzy,
+    mid = find_left_linker(tagged.read.sequence, tags, max_gap_char, mid_len, fuzzy,
         errors, gaps = True)
     if mid:
         tagged.mid, tagged.m_type, tagged.seq_match = mid[0],mid[1],mid[4]
@@ -140,7 +140,7 @@ def get_align_match_position(seq_match_span, start, stop):
         stop = stop - seq_match_span.count('-')
     return start, stop
 
-def leftLinker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
+def find_left_linker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
     '''Matching methods for left linker - regex first, followed by fuzzy (SW)
     alignment, if the option is passed'''
     for tag in tags:
@@ -206,7 +206,7 @@ def find_and_trim_linkers(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
     '''Use regular expression and (optionally) fuzzy string matching
     to locate and trim linkers from sequences'''
 
-    left = leftLinker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
+    left = find_left_linker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
     right = find_right_linker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
 
     # we can have 3 types of matches - tags on left and right sides,
