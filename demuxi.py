@@ -288,7 +288,17 @@ def get_sequence_count(input):
     """Determine the number of sequence reads in the input"""
     return sum([1 for line in open(input, 'rU') if line.startswith('>')])
 
-def singleproc(job, results, params):
+def progress(count, interval, big_interval):
+    """give a rudimentary indication of progress"""
+    if count % big_interval == 0:
+        sys.stdout.write('%')
+        sys.stdout.flush()
+    elif count % interval == 0:
+        sys.stdout.write('.')
+        sys.stdout.flush()
+
+def singleproc(job, results, params, interval = 1000, big_interval = 10000):
+    count = 0
     for sequence in job:
         # set tags = empty
         tags = None
@@ -330,6 +340,8 @@ def singleproc(job, results, params):
             tagged = concat_check(tagged, all_tags, params.all_tags_regex,
                         reverse_linkers, params.fuzzy)
 
+        count += 1
+        progress(count, interval, big_interval)
         results.put(tagged)
     return results
 
@@ -381,6 +393,9 @@ def main():
                 num_reads, params.num_procs)
     else:
         work = FastaQualityReader(params.fasta, params.quality)
+    # give some indication of progress for longer runs
+    if num_reads > 999:
+        sys.stdout.write('Running')
     # MULTICORE
     if params.num_procs > 1:
         jobs = Queue()
@@ -418,13 +433,13 @@ def main():
         singleproc(work, results, params)
         for tagged in results:
             db.insert_record_to_db(cur, tagged)
-    print '\n'
     conn.commit()
     cur.close()
     conn.close()
     end_time = time.time()
-    print 'Ended: ', time.strftime("%a %b %d, %Y  %H:%M:%S", time.localtime(end_time))
-    print '\nTime for execution: ', round((end_time - start_time)/60, 2), 'minutes'
+    pretty_end_time = time.strftime("%a %b %d, %Y  %H:%M:%S", time.localtime(end_time))
+    print "Ended: {} (run time {} minutes)".format(pretty_end_time,
+            round((end_time - start_time)/60, 2))
 
 if __name__ == '__main__':
     main()
