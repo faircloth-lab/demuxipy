@@ -94,7 +94,7 @@ def matches(tag, seq_match_span, tag_match_span, allowed_errors):
         return matches, error
 
 def align(seq, tags, allowed_errors):
-    '''Smith-Waterman alignment method for aligning tags with their respective
+    '''Alignment method for aligning tags with their respective
     sequences.  Only called when regular expression matching patterns fail.
     Inspired by http://github.com/chapmanb/bcbb/tree/master'''
     high_score = {'tag':None, 'seq_match':None, 'mid_match':None, 'score':None, 
@@ -134,7 +134,7 @@ def mid_trim(tagged, tags, max_gap_char, mid_len, fuzzy, errors):
         tagged.read = tagged.read.slice(mid[3],len(tagged.read.sequence), False)
     return tagged
 
-def SWMatchPos(seq_match_span, start, stop):
+def get_align_match_position(seq_match_span, start, stop):
     # slice faster than ''.startswith()
     if seq_match_span[0] == '-':
         start = start + seq_match_span.count('-')
@@ -164,7 +164,7 @@ def leftLinker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
             m_type = 'fuzzy'
             tag = match[0]
             seq_match = match[3]
-            start, stop = SWMatchPos(match[3],match[4], match[5])
+            start, stop = get_align_match_position(match[3],match[4], match[5])
     if match:
         return tag, m_type, start, stop, seq_match
     else:
@@ -193,7 +193,7 @@ def rightLinker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
             m_type = 'fuzzy'
             tag = match[0]
             seq_match = match[3]
-            start, stop = SWMatchPos(match[3],match[4], match[5])
+            start, stop = get_align_match_position(match[3],match[4], match[5])
     if match:
         return revComp(tag), m_type, start, stop, seq_match
     else:
