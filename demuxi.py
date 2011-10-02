@@ -250,10 +250,10 @@ def linkerTrim(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
         trimmed = None
         tagged.l_tag, tagged.l_m_type, tagged.l_seq_match = None, None, None
         tagged.l_critter = None
-    
+
     return tagged
 
-def concatCheck(tagged, all_tags, all_tags_regex, reverse_linkers, fuzzy, errors = 1):
+def concat_check(tagged, all_tags, all_tags_regex, reverse_linkers, fuzzy, errors = 1):
     '''Check screened sequence for the presence of concatemers by scanning 
     for all possible tags - after the 5' and 3' tags have been removed'''
     s = tagged.read.sequence
@@ -370,7 +370,7 @@ def singleproc(job, results, params):
 
         # check for concatemers
         if params.concat and len(tagged.read.sequence) > 0:
-            tagged = concatCheck(tagged, all_tags, params.all_tags_regex,
+            tagged = concat_check(tagged, all_tags, params.all_tags_regex,
                         reverse_linkers, params.fuzzy)
         
         results.put(tagged)
