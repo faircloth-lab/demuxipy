@@ -202,7 +202,7 @@ def both_tags_within_gaps(sequence, left, right, max_gap):
                 right[2] >= (len(sequence) - (len(right[0]) + max_gap)):
         return True
 
-def linkerTrim(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
+def find_and_trim_linkers(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
     '''Use regular expression and (optionally) fuzzy string matching
     to locate and trim linkers from sequences'''
 
@@ -363,7 +363,7 @@ def singleproc(job, results, params):
             else:
                 tags = None
             if tags:
-                tagged = linkerTrim(tagged, tags, params.linker_gap,
+                tagged = find_and_trim_linkers(tagged, tags, params.linker_gap,
                             params.linker_len, params.fuzzy, params.allowed_errors)
                 if tagged.l_tag:
                     tagged.reverse_linker = params.reverse_linkers[tagged.l_tag]
