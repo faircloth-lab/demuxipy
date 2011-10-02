@@ -93,7 +93,7 @@ def matches(tag, seq_match_span, tag_match_span, allowed_errors):
             len(tag_match_span.replace('-','')))
         return matches, error
 
-def smithWaterman(seq, tags, allowed_errors):
+def align(seq, tags, allowed_errors):
     '''Smith-Waterman alignment method for aligning tags with their respective
     sequences.  Only called when regular expression matching patterns fail.
     Inspired by http://github.com/chapmanb/bcbb/tree/master'''
@@ -158,7 +158,7 @@ def leftLinker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
             seq_match = tag
             break
     if not match and fuzzy:
-        match = smithWaterman(s[:max_gap_char + tag_len], tags, errors)
+        match = align(s[:max_gap_char + tag_len], tags, errors)
         # we can trim w/o regex
         if match:
             m_type = 'fuzzy'
@@ -187,7 +187,7 @@ def rightLinker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
             seq_match = tag
             break
     if not match and fuzzy:
-        match = smithWaterman(s[-(tag_len + max_gap_char):], revtags, errors)
+        match = align(s[-(tag_len + max_gap_char):], revtags, errors)
         # we can trim w/o regex
         if match:
             m_type = 'fuzzy'
@@ -330,7 +330,7 @@ def concatCheck(sequence, all_tags, all_tags_regex, reverse_linkers, **kwargs):
             break
     if not match and ['fuzzy']:
     #else:
-        match = smithWaterman(s, all_tags, 1)
+        match = align(s, all_tags, 1)
         # we can trim w/o regex
         if match:
             tag = match[0]
