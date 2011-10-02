@@ -26,7 +26,7 @@ def create_db_and_new_tables(db_name):
         cur.execute('''CREATE TABLE tags (
                 id integer PRIMARY KEY AUTOINCREMENT,
                 name text,
-                id text,
+                mid text,
                 mid_seq text,
                 mid_match text,
                 mid_method text,
