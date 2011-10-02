@@ -198,10 +198,11 @@ def find_right_linker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False)
     else:
         return None
 
-def both_tags_within_gaps(sequence, left, right, max_gap):
-    if left[2] <= max_gap and \
-                right[2] >= (len(sequence) - (len(right[0]) + max_gap)):
+def both_tags_within_gaps(sequence, left, right, max_gap_char, tag_len):
+    if (left[2] <= max_gap_char) and (right[2] <= (max_gap_char + tag_len)):
         return True
+    else:
+        return False
 
 def find_and_trim_linkers(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
     """Use regular expression and (optionally) fuzzy string matching
@@ -212,11 +213,13 @@ def find_and_trim_linkers(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
 
     # we can have 3 types of matches - tags on left and right sides,
     # tags on left side only, tags on right side only, mismatching tags
-    # and no tags at all
+    # and no tags at all.  We take care of matching position (i,e. we
+    # want only matches at the ends) by regex and slicing in the
+    # search methods above.  If for some reason we want to check
+    # for concatemers, then turn that function on.
     if left is not None \
             and right is not None \
-            and left[0] == right[0] and \
-            both_tags_within_gaps(tagged.read.sequence, left, right, max_gap_char):
+            and left[0] == right[0]:
         # trim the read
         tagged.read = tagged.read.slice(left[3], right[2], False)
         # left and right are identical so largely pass back the left
@@ -226,8 +229,7 @@ def find_and_trim_linkers(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
         tagged.l_critter = tags[tagged.l_tag]
 
     elif left and right \
-            and left[0] != right[0] \
-            and both_tags_within_gaps(tagged.read.sequence, left, right, max_gap_char):
+            and left[0] != right[0]:
         # these are no good.  check for within gaps
         # to make sure it's not a spurious match
         tagged.trimmed = None
@@ -238,7 +240,7 @@ def find_and_trim_linkers(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
     elif left and left[2] <= max_gap_char:
         tagged.read = tagged.read.slice(left[3], len(tagged.read.sequence), False)
         tagged.l_tag, tagged.l_seq_match = left[0], left[4]
-        tagged.l_seq_match = "{}-left".format(left[1])
+        tagged.l_m_type = "{}-left".format(left[1])
         tagged.l_critter = tags[tagged.l_tag]
 
     elif right and right[2] >= (len(s) - (len(right[0]) + max_gap_char)):
