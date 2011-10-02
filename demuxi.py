@@ -168,7 +168,7 @@ def leftLinker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
     else:
         return None
 
-def rightLinker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
+def find_right_linker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
     '''Mathing methods for right linker - regex first, followed by fuzzy (SW)
     alignment, if the option is passed'''
     revtags = revCompTags(tags)
@@ -207,8 +207,8 @@ def find_and_trim_linkers(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
     to locate and trim linkers from sequences'''
 
     left = leftLinker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
-    right = rightLinker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
-    
+    right = find_right_linker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
+
     # we can have 3 types of matches - tags on left and right sides,
     # tags on left side only, tags on right side only, mismatching tags
     # and no tags at all
