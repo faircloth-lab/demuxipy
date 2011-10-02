@@ -16,7 +16,7 @@ Requires:
 
 Usage:
 
-    `python linker.py --configuration=linker-py.conf`
+    `python demuxi.py properly-formatted-configuration.conf`
 
 """
 
