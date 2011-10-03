@@ -156,7 +156,7 @@ def find_left_linker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
             # by default, this is true
             seq_match = tag
             break
-    if not match and fuzzy:
+    if match is None and fuzzy:
         match = align(s[:max_gap_char + tag_len], tags, errors)
         # we can trim w/o regex
         if match:
@@ -185,7 +185,7 @@ def find_right_linker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False)
             # by default, this is true
             seq_match = tag
             break
-    if not match and fuzzy:
+    if match is None and fuzzy:
         match = align(s[-(tag_len + max_gap_char):], revtags, errors)
         # we can trim w/o regex
         if match:
@@ -265,15 +265,15 @@ def concat_check(tagged, all_tags, all_tags_regex, reverse_linkers, fuzzy, error
         match = tag.search(s)
         if match:
             tagged.concat_tag= tag.pattern
-            tagged.concat_m_type = 'regex-concat'
-            tagged.seq_match = tag
+            tagged.concat_m_type = "regex-concat"
+            tagged.concat_seq_match = tagged.read.sequence[match.start():match.end()]
             break
-    if not match and ['fuzzy']:
+    if match is None and fuzzy:
         match = align(s, all_tags, errors)
         if match:
             tagged.concat_tag = match[0]
-            tagged.concat_m_type = 'fuzzy-concat'
-            tagged.seq_match = match[3]
+            tagged.concat_m_type = "fuzzy-concat"
+            tagged.concat_seq_match = match[3]
     return tagged
 
 def reverse(items, null=False):
@@ -338,9 +338,9 @@ def singleproc(job, results, params, interval = 1000, big_interval = 10000):
                     tagged.reverse_linker = params.reverse_linkers[tagged.l_tag]
 
         # check for concatemers
-        if params.concat and len(tagged.read.sequence) > 0:
-            tagged = concat_check(tagged, all_tags, params.all_tags_regex,
-                        reverse_linkers, params.fuzzy)
+        if params.concat_check and len(tagged.read.sequence) > 0:
+            tagged = concat_check(tagged, params.all_tags, params.all_tags_regex,
+                        params.reverse_linkers, params.concat_fuzzy, params.concat_errors)
 
         count += 1
         progress(count, interval, big_interval)

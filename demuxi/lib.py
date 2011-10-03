@@ -9,10 +9,12 @@ Description:  common files for demuxi.py
 
 """
 import os
+import re
 import sys
 import argparse
 from multiprocessing import cpu_count
 from tools.sequence.fasta import FastaSequence
+from tools.sequence.transform import DNA_reverse_complement
 
 class FullPaths(argparse.Action):
     """Expand user- and relative-paths"""
@@ -50,9 +52,11 @@ class Parameters():
         self.mid_gap          = self.conf.getint('GeneralParameters','MidGap')
         self.linker_trim      = self.conf.getboolean('Steps', 'LinkerTrim')
         self.linker_gap       = self.conf.getint('GeneralParameters','LinkerGap')
-        self.concat          = self.conf.getboolean('GeneralParameters','CheckForConcatemers')
         self.fuzzy           = self.conf.getboolean('GeneralParameters','FuzzyMatching')
         self.allowed_errors  = self.conf.getint('GeneralParameters','AllowedErrors')
+        self.concat_check    = self.conf.getboolean('Concatemers','ConcatemerChecking')
+        self.concat_fuzzy    = self.conf.getboolean('Concatemers','ConcatemerFuzzyMatching')
+        self.concat_errors   = self.conf.getboolean('Concatemers','ConcatemerAllowedErrors')
         self.mids            = None
         self.reverse_mid     = None
         self.linkers         = None
@@ -92,7 +96,7 @@ class Parameters():
             self._tagLibrary()
             
         # do we check for concatemers?
-        if self.concat:
+        if self.concat_check:
             self._allPossibleTags()
     
     def _linkers(self):
@@ -149,8 +153,8 @@ class Parameters():
                 pass
             self.all_tags.append(self.linkers[l])
             self.all_tags_regex.append(re.compile('%s' % self.linkers[l]))
-            self.all_tags.append(revComp(self.linkers[l]))
-            self.all_tags_regex.append(re.compile('%s' % revComp(self.linkers[l])))
+            self.all_tags.append(DNA_reverse_complement(self.linkers[l]))
+            self.all_tags_regex.append(re.compile('%s' % DNA_reverse_complement(self.linkers[l])))
 
 class Tagged():
     '''Trimming, tag, and sequence data for individual reads'''

@@ -97,7 +97,7 @@ def insert_record_to_db(cur, tagged):
             tagged.l_critter,
             tagged.concat_tag,
             tagged.concat_seq_match,
-            tagged.concat_type
+            tagged.concat_m_type
         )
     )
     key = cur.lastrowid
