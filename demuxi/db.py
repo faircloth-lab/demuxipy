@@ -86,11 +86,11 @@ def insert_record_to_db(cur, tagged):
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''', 
         (
             name,
-            tagged.reverse_mid,
+            tagged.mid_name,
             tagged.mid,
             tagged.seq_match,
             tagged.m_type,
-            tagged.reverse_linker,
+            tagged.l_name,
             tagged.l_tag,
             tagged.l_seq_match,
             tagged.l_m_type,

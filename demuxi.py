@@ -38,6 +38,7 @@ import ConfigParser
 from multiprocessing import Process, Queue, JoinableQueue, cpu_count
 
 from tools.sequence.fasta import FastaQualityReader
+from tools.sequence.transform import DNA_reverse_complement
 from demuxi.lib import FullPaths, ListQueue, Tagged, Parameters
 from demuxi import db
 
@@ -122,17 +123,6 @@ def align(seq, tags, allowed_errors):
     else:
         return None
 
-def mid_trim(tagged, tags, max_gap_char, mid_len, fuzzy, errors):
-    """Remove the MID tag from the sequence read"""
-    #if sequence.id == 'MID_No_Error_ATACGACGTA':
-    #    pdb.set_trace()
-    mid = find_left_linker(tagged.read.sequence, tags, max_gap_char, mid_len, fuzzy,
-        errors, gaps = True)
-    if mid:
-        tagged.mid, tagged.m_type, tagged.seq_match = mid[0],mid[1],mid[4]
-        tagged.read = tagged.read.slice(mid[3],len(tagged.read.sequence), False)
-    return tagged
-
 def get_align_match_position(seq_match_span, start, stop):
     # slice faster than ''.startswith()
     if seq_match_span[0] == '-':
@@ -141,75 +131,97 @@ def get_align_match_position(seq_match_span, start, stop):
         stop = stop - seq_match_span.count('-')
     return start, stop
 
-def find_left_linker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
+def find_left_linker(s, tag_regexes, tag_strings, max_gap_char, tag_len, fuzzy, errors):
     """Matching methods for left linker - regex first, followed by fuzzy (SW)
     alignment, if the option is passed"""
-    for tag in tags:
-        if gaps:
-            regex = re.compile(('^%s') % (tag))
-        else:
-            regex = re.compile(('^[acgtnACGTN]{0,%s}%s') % (max_gap_char, tag))
+    for regex in tag_regexes:
         match = regex.search(s)
-        if match:
+        if match is not None:
             m_type = 'regex'
             start, stop = match.start(), match.end()
             # by default, this is true
-            seq_match = tag
+            tag_matched = regex.pattern.split('}')[1]
+            seq_matched = s[start:stop]
             break
     if match is None and fuzzy:
-        match = align(s[:max_gap_char + tag_len], tags, errors)
+        match = align(s[:max_gap_char + tag_len], tag_strings, errors)
         # we can trim w/o regex
         if match:
             m_type = 'fuzzy'
-            tag = match[0]
-            seq_match = match[3]
+            tag_matched = match[0]
+            seq_matched = match[3]
             start, stop = get_align_match_position(match[3],match[4], match[5])
     if match:
-        return tag, m_type, start, stop, seq_match
+        return tag_matched, m_type, start, stop, seq_matched
     else:
         return None
 
-def find_right_linker(s, tags, max_gap_char, tag_len, fuzzy, errors, gaps=False):
-    """Mathing methods for right linker - regex first, followed by fuzzy (SW)
+def find_right_linker(s, tag_regexes, tag_strings, max_gap_char, tag_len,
+        fuzzy, errors, tagged):
+    """Matching methods for right linker - regex first, followed by fuzzy (SW)
     alignment, if the option is passed"""
-    revtags = revCompTags(tags)
-    for tag in revtags:
-        if gaps:
-            regex = re.compile(('%s$') % (tag))
-        else:
-            regex = re.compile(('%s[acgtnACGTN]{0,%s}$') % (tag, max_gap_char))
+
+    for regex in tag_regexes:
         match = regex.search(s)
-        if match:
+        if match is not None:
             m_type = 'regex'
             start, stop = match.start(), match.end()
             # by default, this is true
-            seq_match = tag
+            tag_matched = regex.pattern.split('[')[0]
+            seq_matched = s[start:stop]
             break
     if match is None and fuzzy:
-        match = align(s[-(tag_len + max_gap_char):], revtags, errors)
+        match = align(s[-(tag_len + max_gap_char):], tag_strings, errors)
         # we can trim w/o regex
         if match:
             m_type = 'fuzzy'
-            tag = match[0]
-            seq_match = match[3]
+            tag_matched = match[0]
+            seq_matched = match[3]
             start, stop = get_align_match_position(match[3],match[4], match[5])
     if match:
-        return revComp(tag), m_type, start, stop, seq_match
+        return DNA_reverse_complement(tag_matched), m_type, start, stop, DNA_reverse_complement(seq_matched)
     else:
         return None
 
-def both_tags_within_gaps(sequence, left, right, max_gap_char, tag_len):
-    if (left[2] <= max_gap_char) and (right[2] <= (max_gap_char + tag_len)):
-        return True
-    else:
-        return False
+def mid_trim(tagged, params):
+    """Remove the MID tag from the sequence read"""
+    #if sequence.id == 'MID_No_Error_ATACGACGTA':
+    #    pdb.set_trace()
+    mid = find_left_linker(tagged.read.sequence,
+            params.sequence_tags.mids['forward_regex'], 
+            params.sequence_tags.mids['forward_string'],
+            params.sequence_tags.mid_gap,
+            params.sequence_tags.mid_len,
+            params.mid_fuzzy,
+            params.mid_allowed_errors)
+    if mid:
+        tagged.mid, tagged.m_type, tagged.seq_match = mid[0],mid[1],mid[4]
+        tagged.read = tagged.read.slice(mid[3],len(tagged.read.sequence), False)
+        tagged.mid_name = params.sequence_tags.reverse_mid_lookup[tagged.mid]
+    return tagged
 
-def find_and_trim_linkers(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
+def find_and_trim_linkers(tagged, params):
     """Use regular expression and (optionally) fuzzy string matching
     to locate and trim linkers from sequences"""
+    #if '>MID15_NoError_SimpleX1_NoError_FandR' in tagged.read.identifier:
+    #    pdb.set_trace()
+    left = find_left_linker(tagged.read.sequence,
+            params.sequence_tags.linkers[tagged.mid]['forward_regex'],
+            params.sequence_tags.linkers[tagged.mid]['forward_string'],
+            params.sequence_tags.linker_gap,
+            params.sequence_tags.linker_len,
+            params.linker_fuzzy,
+            params.linker_allowed_errors)
 
-    left = find_left_linker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
-    right = find_right_linker(tagged.read.sequence, tags, max_gap_char, tag_len, fuzzy, errors)
+    right = find_right_linker(tagged.read.sequence,
+            params.sequence_tags.linkers[tagged.mid]['reverse_regex'],
+            params.sequence_tags.linkers[tagged.mid]['reverse_string'],
+            params.sequence_tags.linker_gap,
+            params.sequence_tags.linker_len,
+            params.linker_fuzzy,
+            params.linker_allowed_errors, tagged)
+
+    max_gap_char = params.sequence_tags.linker_gap
 
     # we can have 5 types of matches - tags on left and right sides,
     # tags on left side only, tags on right side only, mismatching tags
@@ -217,6 +229,7 @@ def find_and_trim_linkers(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
     # want only matches at the ends) by regex and slicing in the
     # search methods above.  If for some reason you want to check
     # for concatemers, then turn that function on.
+
     if left is not None \
             and right is not None \
             and left[0] == right[0]:
@@ -226,50 +239,58 @@ def find_and_trim_linkers(tagged, tags, max_gap_char, tag_len, fuzzy, errors):
         # info... except for m_type which can be a combination
         tagged.l_tag, tagged.l_seq_match = left[0], left[4]
         tagged.l_m_type = "{}-{}-both".format(left[1], right[1])
-        tagged.l_critter = tags[tagged.l_tag]
 
     elif left and right \
             and left[0] != right[0]:
         # these are no good.  check for within gaps
         # to make sure it's not a spurious match
+        pdb.set_trace()
         tagged.trimmed = None
         tagged.l_tag, tagged.l_seq_match = None, None
         tagged.l_m_type = "tag-mismatch"
         tagged.l_critter = None
+        tagged.l_name = None
 
     elif left and left[2] <= max_gap_char:
         tagged.read = tagged.read.slice(left[3], len(tagged.read.sequence), False)
         tagged.l_tag, tagged.l_seq_match = left[0], left[4]
         tagged.l_m_type = "{}-left".format(left[1])
-        tagged.l_critter = tags[tagged.l_tag]
 
     elif right and right[2] >= (len(s) - (len(right[0]) + max_gap_char)):
         tagged.read = tagged.read.slice(0, right[2], False)
         tagged.l_tag, tagged.l_seq_match = right[0], right[4]
         tagged.l_m_type = "{}-right".format(right[1])
-        tagged.l_critter = tags[tagged.l_tag]
 
     else:
         trimmed = None
         tagged.l_tag, tagged.l_m_type, tagged.l_seq_match = None, None, None
         tagged.l_critter = None
+        tagged.l_name = None
+    
+    if tagged.l_tag:
+        tagged.l_critter = params.sequence_tags.cluster_map[str(tagged.mid)][str(tagged.l_tag)]
+        tagged.l_name = params.sequence_tags.reverse_linker_lookup[tagged.l_tag]
 
     return tagged
 
-def concat_check(tagged, all_tags, all_tags_regex, reverse_linkers, fuzzy, errors = 1):
+def concat_check(tagged, params):
     """Check screened sequence for the presence of concatemers by scanning 
     for all possible tags - after the 5' and 3' tags have been removed"""
     s = tagged.read.sequence
     m_type = None
-    for tag in all_tags_regex:
+    #pdb.set_trace()
+    for tag in params.sequence_tags.all_tags[str(tagged.mid)]['regex']:
         match = tag.search(s)
         if match:
             tagged.concat_tag= tag.pattern
             tagged.concat_m_type = "regex-concat"
             tagged.concat_seq_match = tagged.read.sequence[match.start():match.end()]
             break
-    if match is None and fuzzy:
-        match = align(s, all_tags, errors)
+    if match is None and params.concat_fuzzy:
+        match = align(s,
+                params.sequence_tags.all_tags[str(tagged.mid)]['string'], 
+                params.concat_allowed_errors
+            )
         if match:
             tagged.concat_tag = match[0]
             tagged.concat_m_type = "fuzzy-concat"
@@ -302,46 +323,28 @@ def progress(count, interval, big_interval):
 def singleproc(job, results, params, interval = 1000, big_interval = 10000):
     count = 0
     for sequence in job:
-        # set tags = empty
-        tags = None
         # for now, we'll keep this here
         tagged = Tagged(sequence)
+        # trim
         if params.qual_trim:
             #pdb.set_trace()
             tagged.read = tagged.read.trim(params.min_qual, False)
 
         # check for MIDs
         if params.mid_trim:
-            tagged = mid_trim(tagged, params.tags, params.mid_gap, \
-                    params.mid_len, params.mid_fuzzy, params.mid_allowed_errors)
-            if tagged.mid:
-                tagged.reverse_mid = params.reverse_mid[tagged.mid]
+            tagged = mid_trim(tagged, params)
 
         # check for linkers
-        if params.linker_trim:
-            # if we never trimmed the MID, then the tags are in 
-            # the param object
-            if not params.mid_trim:
-                tags = params.tags
-            # if we're tagging hierarchically, then we should get a
-            # mid.
-            elif tagged.mid is not None:
-                # reduce out list of possible tags to only those that
-                # that go w/ this particular MID
-                tags = params.tags[tagged.mid]
-            else:
-                tags = None
-            if tags:
-                tagged = find_and_trim_linkers(tagged, tags, params.linker_gap,
-                            params.linker_len, params.linker_fuzzy,
-                            params.linker_allowed_errors)
-                if tagged.l_tag:
-                    tagged.reverse_linker = params.reverse_linkers[tagged.l_tag]
+        if (params.linker_trim and tagged.mid and params.search == 'MidLinkerGroups') or \
+                (params.linker_trim and params.search == 'LinkerGroups'):
+            tagged = find_and_trim_linkers(tagged, params)
 
         # check for concatemers
-        if params.concat_check and len(tagged.read.sequence) > 0:
-            tagged = concat_check(tagged, params.all_tags, params.all_tags_regex,
-                        params.reverse_linkers, params.concat_fuzzy, params.concat_errors)
+        if (params.concat_check and len(tagged.read.sequence) > 0) and \
+                ((tagged.mid and tagged.l_tag and params.search == 'MidLinkerGroups') or \
+                (tagged.mid and params.search == 'MidGroups') or \
+                (tagged.l_tag and params.search == 'LinkerGroups')):
+            tagged = concat_check(tagged, params)
 
         count += 1
         progress(count, interval, big_interval)
@@ -384,7 +387,7 @@ def main():
     conf = ConfigParser.ConfigParser()
     conf.read(args.config)
     params = Parameters(conf)
-    pdb.set_trace()
+    #pdb.set_trace()
     # create the db and tables, returninn connection
     # and cursor
     conn, cur = db.create_db_and_new_tables(params.db)
