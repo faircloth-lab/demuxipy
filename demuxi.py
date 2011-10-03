@@ -421,7 +421,7 @@ def main():
         # that the db can (in theory) consume them at
         # a rather consistent rate rather than in spurts
         #for unit in xrange(num_reads):
-        for unit in xrange(18):
+        for unit in xrange(num_reads):
             #enter_to_db(results.get())
             db.insert_record_to_db(cur, results.get())
             results.task_done()
