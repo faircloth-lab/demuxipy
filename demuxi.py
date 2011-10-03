@@ -384,6 +384,7 @@ def main():
     conf = ConfigParser.ConfigParser()
     conf.read(args.config)
     params = Parameters(conf)
+    pdb.set_trace()
     # create the db and tables, returninn connection
     # and cursor
     conn, cur = db.create_db_and_new_tables(params.db)

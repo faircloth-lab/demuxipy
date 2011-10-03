@@ -12,9 +12,12 @@ import os
 import re
 import sys
 import argparse
+from collections import defaultdict
 from multiprocessing import cpu_count
 from tools.sequence.fasta import FastaSequence
 from tools.sequence.transform import DNA_reverse_complement
+
+import pdb
 
 class FullPaths(argparse.Action):
     """Expand user- and relative-paths"""
@@ -59,11 +62,11 @@ class Parameters():
         self.concat_check    = self.conf.getboolean('Concatemers','ConcatemerChecking')
         self.concat_fuzzy    = self.conf.getboolean('Concatemers','ConcatemerFuzzyMatching')
         self.concat_errors   = self.conf.getboolean('Concatemers','ConcatemerAllowedErrors')
+        self.search          = self.conf.get('Search','SearchFor')
         self.mids            = None
         self.reverse_mid     = None
         self.linkers         = None
         self.reverse_linkers = None
-        self.clust           = None
         self.tags            = None
         self.all_tags        = None
         self.all_tags_regex  = None
@@ -80,66 +83,99 @@ class Parameters():
     def __repr__(self):
         return '''<linkers.parameters run values>'''
     
-    def _setup(self):
-        if self.mid_trim and self.linker_trim:
-            self._mid()
-            self._linkers()
-            self.clust       = self.conf.items('MidLinkerGroups')
-            self._tagLibrary()
+    def _build_both_tag_libraries(self, all_mids, all_linkers):
+        '''Create a tag-library from the mids and the linkers which allows us to 
+        track which organisms go with which MID+linker combo'''
+        self.tags = defaultdict(lambda : defaultdict(str))
+        self.mids = defaultdict(str)
+        self.linkers = defaultdict(str)
+        for c in self.clust:
+            pdb.set_trace()
+            if self.mid_trim and self.linker_trim:
+                m,l = c[0].replace(' ','').split(',')
+                org = c[1]
+                self.mids[m] = all_mids[m]
+                self.linkers[l] = all_linkers[l]
+                self.tags[all_mids[m]][all_linkers[l]] = org
+        self.mids_f_regex = _regex_builder(self.mids.values(), self.mid_gap)
+        self.linkers_f_regex = _regex_builder(self.linkers.values(), 
+                self.linker_gap)
+        self.linkers_r_regex = _regex_builder(self.linkers.values(),
+                self.linker_gap, reverse = True)
 
-        elif self.mid_trim and not self.linker_trim:
-            self_mid()
-            self.clust       = self.conf.items('MidGroup')
-            self._tagLibrary()
-            
-        elif not self.mid_trim and self.linker_trim:
-            self._linkers()
-            self.clust       = self.conf.items('LinkerGroups')
-            self._tagLibrary()
+    def _build_linker_tag_library(self, all_linkers)
+        for c in self.clust:
+            l = c[0]
+            org = c[1]
+            self.linkers[l] = all_linkers[l]
+            self.tags[self.linkers[l]] = org
+        self.linkers_f_regex = _regex_builder(self.linkers.values(), 
+                self.linker_gap)
+        self.linkers_r_regex = _regex_builder(self.linkers.values(),
+                self.linker_gap, reverse = True)
+
+    def _build_mid_tag_library(self, all_mids)
+        for c in self.clust:
+            l = c[0]
+            org = c[1]
+            self.mids[m] all_mids[m]
+            self.tags[self.mids[l]] = org
+        self.mids_f_regex = _regex_builder(self.mids.values(), self.mid_gap)
+
+    def _setup(self):
+        if self.mid_trim and self.linker_trim and self.search == 'MidLinkerGroups':
+            # get the list of taxa to tags
+            self.clust = self.conf.items(self.search)
+            # we need a list of all MIDs possible and their length
+            all_mids, self.mid_len = self._mid()
+            # we need a list of all linkers possible and their length
+            all_linkers, self.linker_len = self._linkers()
+            # reduce MIDS and linkers to only those we're using
+            self._build_both_tag_libraries(all_mids, all_linkers)
+
+        elif self.mid_trim and not self.linker_trim and self.search == "MidGroup":
+            # get the list of taxa to tags
+            self.clust = self.conf.items(self.search)
+            # we need a list of all MIDs possible and their length
+            all_mids, self.mid_len = self._mid()
+            # reduce MIDS and linkers to only those we're using
+            self._build_mid_tag_library(all_mids)
+
+        elif not self.mid_trim and self.linker_trim and self.search == "LinkerGroup":
+            # get the list of taxa to tags
+            self.clust = self.conf.items(self.search)
+            # we need a list of all linkers possible and their length
+            all_linkers, self.linker_len = self._linkers()
+            # reduce MIDS and linkers to only those we're using
+            self._build_linker_tag_libraries(all_linkers)
             
         # do we check for concatemers?
         if self.concat_check:
             self._allPossibleTags()
-    
-    def _linkers(self):
-        self.linkers         = dict(self.conf.items('Linker'))
-        self.reverse_linkers = reverse(self.conf.items('Linker'), True)
-        lset = set([len(l) for l in self.linkers.values()])
-        assert len(lset) == 1, "Your linker sequences are difference lengths"
-        self.linker_len = lset.pop()
-    
-    def _mid(self):
-        self.mids            = dict(self.conf.items('Mid'))
-        self.reverse_mid     = reverse(self.conf.items('Mid'), True)
-        mset = set([len(m) for m in self.mids.values()])
-        assert len(mset) == 1, "Your MID sequences are different lengths"
-        self.mid_len = mset.pop()
+
+    def _regex_builder(self, tags, gap, reverse = True):
+        if not reverse:
+            return [re.compile('^[acgtnACGTN]{{0,{}}}{}'.format(gap, seq)) for name, seq in
+                tags.iteritems()]
+        else:
+            return [re.compile('{}[acgtnACGTN]{{0,{}}}$'.format(DNA_reverse_complement(seq), 
+                gap)) for name, seq in tags.iteritems()]
 
     
-    def _tagLibrary(self):
-        '''Create a tag-library from the mids and the linkers which allows us to 
-        track which organisms go with which MID+linker combo'''
-        self.tags = {}
-        for c in self.clust:
-            #pdb.set_trace()
-            if self.mids and self.linkers:
-                m,l = c[0].replace(' ','').split(',')
-                org = c[1]
-                if self.mids[m] not in self.tags.keys():
-                    self.tags[self.mids[m]] = {self.linkers[l]:org}
-                else:
-                    self.tags[self.mids[m]][self.linkers[l]] = org
-            
-            elif not self.mids and self.linkers:
-                l = c[0]
-                org = c[1]
-                self.tags[self.linkers[l]] = org
-            
-            elif self.mids and not self.linker:
-                l = c[0]
-                org = c[1]
-                self.tags[self.mids[l]] = org
+    def _linkers(self):
+        linkers         = dict(self.conf.items('Linker'))
+        lset = set([len(l) for l in linkers.values()])
+        assert len(lset) == 1, "Your linker sequences are difference lengths"
+        linker_len = lset.pop()
+        return linkers, linker_len
     
+    def _mid(self):
+        mids = dict(self.conf.items('Mid'))
+        mset = set([len(m) for m in mids.values()])
+        assert len(mset) == 1, "Your MID sequences are different lengths"
+        mid_len = mset.pop()
+        return mids, mid_len
+
     def _allPossibleTags(self):
         '''Create regular expressions for the forward and reverse complements
         of all of the tags sequences used in a run'''
