@@ -313,7 +313,7 @@ def singleproc(job, results, params, interval = 1000, big_interval = 10000):
         # check for MIDs
         if params.mid_trim:
             tagged = mid_trim(tagged, params.tags, params.mid_gap, \
-                    params.mid_len, params.fuzzy, params.allowed_errors)
+                    params.mid_len, params.mid_fuzzy, params.mid_allowed_errors)
             if tagged.mid:
                 tagged.reverse_mid = params.reverse_mid[tagged.mid]
 
@@ -333,7 +333,8 @@ def singleproc(job, results, params, interval = 1000, big_interval = 10000):
                 tags = None
             if tags:
                 tagged = find_and_trim_linkers(tagged, tags, params.linker_gap,
-                            params.linker_len, params.fuzzy, params.allowed_errors)
+                            params.linker_len, params.linker_fuzzy,
+                            params.linker_allowed_errors)
                 if tagged.l_tag:
                     tagged.reverse_linker = params.reverse_linkers[tagged.l_tag]
 
