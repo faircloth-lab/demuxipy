@@ -65,19 +65,6 @@ def motd():
     """
     print motd
 
-def revComp(seq):
-    """Return reverse complement of seq"""
-    bases = string.maketrans('AGCTagct','TCGAtcga')
-    # translate it, reverse, return
-    return seq.translate(bases)[::-1]
-
-def revCompTags(tags):
-    """Return the reverse complements of a tag dictionary"""
-    revTags = {}
-    for tag in tags:
-        revTags[revComp(tag)] = tags[tag]
-    return revTags
-
 def matches(tag, seq_match_span, tag_match_span, allowed_errors):
     """Determine the gap/error counts for a particular match"""
     # deal with case where tag match might be perfect, but extremely gappy, 
@@ -297,16 +284,6 @@ def concat_check(tagged, params):
             tagged.concat_seq_match = match[3]
     return tagged
 
-def reverse(items, null=False):
-    """build a reverse dictionary from a list of tuples"""
-    l = []
-    if null:
-        items += ((None, None),)
-    for i in items:
-        t = (i[1],i[0])
-        l.append(t)
-    return dict(l)
-
 def progress(count, interval, big_interval):
     """give a rudimentary indication of progress"""
     if count % big_interval == 0:
@@ -465,7 +442,7 @@ def main():
     conn.close()
     end_time = time.time()
     pretty_end_time = time.strftime("%a %b %d, %Y  %H:%M:%S", time.localtime(end_time))
-    print "Ended: {} (run time {} minutes)".format(pretty_end_time,
+    print "\nEnded: {} (run time {} minutes)".format(pretty_end_time,
             round((end_time - start_time)/60, 3))
 
 if __name__ == '__main__':
