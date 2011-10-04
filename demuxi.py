@@ -400,6 +400,7 @@ def main():
     # give some indication of progress for longer runs
     if num_reads > 999:
         sys.stdout.write('Running')
+
     # MULTICORE
     if params.num_procs > 1:
         jobs = Queue()
@@ -431,8 +432,11 @@ def main():
         # close up our queues
         jobs.close()
         results.close()
+
     # SINGLECORE
     else:
+        # fake a multiprocessing queue, so stacking and accessing results
+        # is identical.
         results = ListQueue()
         singleproc(work, results, params)
         for tagged in results:
