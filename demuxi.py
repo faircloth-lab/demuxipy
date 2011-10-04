@@ -307,10 +307,6 @@ def reverse(items, null=False):
         l.append(t)
     return dict(l)
 
-def get_sequence_count(input):
-    """Determine the number of sequence reads in the input"""
-    return sum([1 for line in open(input, 'rU') if line.startswith('>')])
-
 def progress(count, interval, big_interval):
     """give a rudimentary indication of progress"""
     if count % big_interval == 0:
@@ -367,8 +363,14 @@ def get_args():
             action=FullPaths)
     return parser.parse_args()
 
-def split_reads_into_groups(fasta, qual, num_reads, num_procs):
-    reads = FastaQualityReader(fasta, qual)
+def get_sequence_count(input, kind):
+    """Determine the number of sequence reads in the input"""
+    if kind == 'fasta':
+        return sum([1 for line in open(input, 'rU') if line.startswith('>')])
+    elif kind == 'fastq':
+        return sum([1 for line in open(input, 'rU') if line.startswith('@')])
+
+def split_fasta_reads_into_groups(reads, num_reads, num_procs):
     job_size = num_reads/num_procs
     print "Parsing reads into groups of {} reads".format(job_size)
     i = iter(reads)
@@ -376,6 +378,31 @@ def split_reads_into_groups(fasta, qual, num_reads, num_procs):
     while chunk:
         yield chunk
         chunk = list(itertools.islice(i, job_size))
+
+def get_work(params):
+    if params.fasta and params.quality:
+        reads = FastaQualityReader(params.fasta, params.quality)
+        # get read count of input
+        num_reads = get_sequence_count(params.fasta, 'fasta')
+        if params.num_procs > 1:
+            # split reads into generator objects based on equal
+            # split across cores
+            work = split_fasta_reads_into_groups(reads,
+                    num_reads, params.num_procs)
+        else:
+            work = FastaQualityReader(params.fasta, params.quality)
+    elif params.fastq:
+        reads = FastqReader(params.fastq)
+        # get read count of input
+        num_reads = get_sequence_count(params.fasta, 'fastq')
+        if params.num_procs > 1:
+            # split reads into generator objects based on equal
+            # split across cores
+            work = split_fasta_reads_into_groups(reads,
+                    num_reads, params.num_procs)
+        else:
+            work = FastqReader(params.fasta, params.quality)
+    return num_reads, work
 
 def main():
     """Main loop"""
@@ -391,15 +418,8 @@ def main():
     # create the db and tables, returninn connection
     # and cursor
     conn, cur = db.create_db_and_new_tables(params.db)
-    # get read count of input
-    num_reads = get_sequence_count(params.fasta)
-    if params.num_procs > 1:
-        # split reads into generator objects based on equal
-        # split across cores
-        work = split_reads_into_groups(params.fasta, params.quality,
-                num_reads, params.num_procs)
-    else:
-        work = FastaQualityReader(params.fasta, params.quality)
+    # get num reads and split up work
+    num_reads, work = get_work(params)
     # give some indication of progress for longer runs
     if num_reads > 999:
         sys.stdout.write('Running')

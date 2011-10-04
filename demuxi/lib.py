@@ -12,6 +12,7 @@ import os
 import re
 import sys
 import argparse
+import ConfigParser
 from collections import defaultdict
 from multiprocessing import cpu_count
 from tools.sequence.fasta import FastaSequence
@@ -43,11 +44,13 @@ class Parameters():
     '''linkers.py run parameters'''
     def __init__(self, conf):
         self.conf = conf
-        #try:
-        self.fasta        = self.conf.get('Sequence','fasta')
-        self.quality      = self.conf.get('Sequence','quality')
-        #except:
-        #    self.fastq       = self.conf.get('Input','fastq')
+        try:
+            self.fasta        = self.conf.get('Sequence','fasta').strip("'")
+            self.quality      = self.conf.get('Sequence','quality').strip("'")
+        except ConfigParser.NoOptionError:
+            self.fastq       = self.conf.get('Sequence','fastq').strip("'")
+        except ConfigParser.NoOptionError:
+            print "Cannot find valid sequence files in [Sequence] section of {}".format(self.conf)
         self.db               = self.conf.get('Database','DATABASE')
         self.qual_trim        = self.conf.getboolean('Quality', 'QualTrim')
         self.min_qual         = self.conf.getint('Quality', 'MinQualScore')
