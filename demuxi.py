@@ -37,11 +37,14 @@ import ConfigParser
 
 from multiprocessing import Process, Queue, JoinableQueue, cpu_count
 
+from tools.sequence.fastq import FastqReader
 from tools.sequence.fasta import FastaQualityReader
 from tools.sequence.transform import DNA_reverse_complement
-from demuxi.lib import FullPaths, ListQueue, Tagged, Parameters
-from demuxi import db
 
+from demuxi import db
+from demuxi.lib import FullPaths, ListQueue, Tagged, Parameters
+
+# the remaining biopython holdout
 from Bio import pairwise2
 
 
