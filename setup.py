@@ -13,8 +13,8 @@ if __name__ == '__main__':
             +"parallel sequencing reads",
         author="Brant Faircloth",
         author_email="brant.faircloth+demuxipy@gmail.com ",
-        url="http://baddna.github.com/demuxipy/",
-        license="BSD",
+        url="http://github.com/faircloth-lab/demuxipy",
+        license="http://www.opensource.org/licenses/BSD-3-Clause",
         classifiers=[
             'Development Status :: 4 - Beta',
             'Environment :: Console',
@@ -24,17 +24,18 @@ if __name__ == '__main__':
             'Programming Language :: Python',
             'Topic :: Scientific/Engineering :: Bio-Informatics',
              ],
-        requires=['numpy(>=1.3)',],
-        long_description=open('README.txt').read(),
-        packages=['demuxipy',
-                'demuxipy.tests',
-                ],
+        requires=['numpy(>=1.3)','seqtools(>=0.5)'],
+        long_description=open('README.rst').read(),
         scripts=['bin/demuxi.py',
                 ],
         ext_modules=[
                 Extension(
                     'demuxipy/cpairwise2',
-                    ['demuxipy/cpairwise2module.c']
+                        [
+                            'demuxipy/cpairwise2module.c'
+                        ]
                     ),
-                ]
+                ],
+        packages=find_packages(),
+        include_package_data = True,
         )
