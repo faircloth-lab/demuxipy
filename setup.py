@@ -24,13 +24,8 @@ if __name__ == '__main__':
             'Programming Language :: Python',
             'Topic :: Scientific/Engineering :: Bio-Informatics',
              ],
-        requires=['NumPy (>=1.3)',],
+        requires=['numpy(>=1.3)',],
         long_description=open('README.txt').read(),
-        package_data = {
-                # If any package contains *.txt or *.rst files, include them:
-                '': ['*.txt', '*.rst'],
-                'demuxipy': ['tests/test-data/*.txt'],
-            },
         packages=['demuxipy',
                 'demuxipy.tests',
                 ],
