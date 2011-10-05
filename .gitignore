@@ -4,3 +4,8 @@
 linker-dist-test.conf
 output/
 *.sqlite
+*.egg
+*.gz
+*.egg-info
+build
+dist
