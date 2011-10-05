@@ -15,8 +15,8 @@ import argparse
 import ConfigParser
 from collections import defaultdict
 from multiprocessing import cpu_count
-from tools.sequence.fasta import FastaSequence
-from tools.sequence.transform import DNA_reverse_complement
+from seqtools.sequence.fasta import FastaSequence
+from seqtools.sequence.transform import DNA_reverse_complement
 
 import pdb
 

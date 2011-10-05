@@ -1,25 +1,16 @@
 #!/usr/bin/env python
 # encoding: utf-8
-"""
-linker.py
-
-Copyright (c) 2009-2010 Brant C. Faircloth.  All rights reserved.
-
-Provides:
-    - parsing and error correction of hierarchically tagged
-        next generation sequence reads
-
-Requires:
-    - Python > 2.7.x
-    - Biopython
-    - numpy
-
-Usage:
-
-    `python demuxi.py properly-formatted-configuration.conf`
 
 """
+File: demuxi.py
+Author: Brant Faircloth
 
+Created by Brant Faircloth on 05 October 2011 14:10 PDT (-0700)
+Copyright (c) 2011 Brant C. Faircloth. All rights reserved.
+
+Description: 
+
+"""
 import pdb
 
 import os
@@ -31,21 +22,18 @@ import string
 import cPickle
 import sqlite3
 import argparse
-import progress
 import itertools
 import ConfigParser
 
 from multiprocessing import Process, Queue, JoinableQueue, cpu_count
 
-from tools.sequence.fastq import FastqReader
-from tools.sequence.fasta import FastaQualityReader
-from tools.sequence.transform import DNA_reverse_complement
+from seqtools.sequence.fastq import FastqReader
+from seqtools.sequence.fasta import FastaQualityReader
+from seqtools.sequence.transform import DNA_reverse_complement
 
-from demuxi import db
-from demuxi.lib import FullPaths, ListQueue, Tagged, Parameters
-
-# the remaining biopython holdout
-from Bio import pairwise2
+from demuxipy import db
+from demuxipy import pairwise2
+from demuxipy.lib import FullPaths, ListQueue, Tagged, Parameters
 
 
 def motd():
