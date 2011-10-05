@@ -45,8 +45,11 @@ class Parameters():
     def __init__(self, conf):
         self.conf = conf
         try:
-            self.fasta        = self.conf.get('Sequence','fasta').strip("'")
-            self.quality      = self.conf.get('Sequence','quality').strip("'")
+            self.fasta        = os.path.abspath(os.path.expanduser(
+                    self.conf.get('Sequence','fasta').strip("'")))
+            self.quality      = os.path.abspath(os.path.expanduser( \
+                    self.conf.get('Sequence','quality').strip("'")))
+
         except ConfigParser.NoOptionError:
             self.fastq       = self.conf.get('Sequence','fastq').strip("'")
         except ConfigParser.NoOptionError:
