@@ -140,7 +140,7 @@ following should be of interest:
   Willerslev E (2009) The use of coded PCR primers enables
   high-throughput sequencing of multiple homolog amplification products
   by 454 parallel sequencing.  BMC Bioinformatics
-  10:362<http://dx.doi.org/10.1371/journal.pone.0000197>`_
+  10:362 <http://dx.doi.org/10.1371/journal.pone.0000197>`_
 
 - `Levenshtein VI (1966). Binary codes capable of correcting deletions,
   insertions, and reversals. Soviet Physics Doklady 10:707–10
