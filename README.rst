@@ -37,7 +37,7 @@ previous software/methodological approaches because:
   combinations so that only those combinations within a given run are
   search for.
 
- - it can search for potential concatemers within sequence reads
+- it can search for potential concatemers within sequence reads
 
 Dependencies
 ------------
@@ -140,15 +140,15 @@ following should be of interest:
   Willerslev E (2009) The use of coded PCR primers enables
   high-throughput sequencing of multiple homolog amplification products
   by 454 parallel sequencing.  BMC Bioinformatics
-  10:362<http://dx.doi.org/10.1371/journal.pone.0000197>`
+  10:362<http://dx.doi.org/10.1371/journal.pone.0000197>`_
 
 - `Levenshtein VI (1966). Binary codes capable of correcting deletions,
   insertions, and reversals. Soviet Physics Doklady 10:707–10
-  <http://sascha.geekheim.de/wp-content/uploads/2006/04/levenshtein.pdf>`
+  <http://sascha.geekheim.de/wp-content/uploads/2006/04/levenshtein.pdf>`_
 
 - `Hamming RW (1950) Error detecting and error correcting codes. Bell
   System Technical Journal 26 (2):147–160
-  <http://www.caip.rutgers.edu/~bushnell/dsdwebsite/hamming.pdf>`
+  <http://www.caip.rutgers.edu/~bushnell/dsdwebsite/hamming.pdf>`_
 
 
 .. _multiprocessing: http://en.wikipedia.org/wiki/Multiprocessing
@@ -162,4 +162,4 @@ following should be of interest:
 .. _README: http://github.com/faircloth-lab/seqtools/README.rst
 .. _python-nose: http://code.google.com/p/python-nose/
 .. _FAQ: https://github.com/faircloth-lab/demuxipy/wiki/faq
-
+.. _sqlite:  http://www.sqlite.org/
