@@ -9,3 +9,4 @@ output/
 *.egg-info
 build
 dist
+myhtmldocs
