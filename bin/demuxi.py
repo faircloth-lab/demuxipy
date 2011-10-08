@@ -315,8 +315,8 @@ def singleproc(job, results, params, interval = 1000, big_interval = 10000):
                 
 
         # check for linkers
-        if (params.inner and tagged.outer_seq and params.search == 'MidLinkerGroups') or \
-                (params.inner and params.search == 'LinkerGroups'):
+        if (params.inner and tagged.outer_seq and params.search == 'OuterInnerGroups') or \
+                (params.inner and params.search == 'OuterGroups'):
             result = find_and_trim_linkers(tagged, 
                     params.sequence_tags.inners[tagged.outer_seq]['forward_regex'],
                     params.sequence_tags.inners[tagged.outer_seq]['forward_string'],
@@ -336,9 +336,10 @@ def singleproc(job, results, params, interval = 1000, big_interval = 10000):
 
         # check for concatemers
         if (params.concat_check and len(tagged.read.sequence) > 0) and \
-                ((tagged.outer_seq and tagged.inner_seq and params.search == 'MidLinkerGroups') or \
-                (tagged.outer_seq and params.search == 'MidGroups') or \
-                (tagged.inner_seq and params.search == 'LinkerGroups')):
+                ((tagged.outer_seq and tagged.inner_seq and params.search ==
+                    'OuterInnerGroups') or \
+                (tagged.outer_seq and params.search == 'OuterGroups') or \
+                (tagged.inner_seq and params.search == 'InnerGroups')):
             tagged = concat_check(tagged, params)
 
         count += 1

@@ -57,21 +57,21 @@ class Parameters():
         self.db               = self.conf.get('Database','DATABASE')
         self.qual_trim        = self.conf.getboolean('Quality', 'QualTrim')
         self.min_qual         = self.conf.getint('Quality', 'MinQualScore')
-        self.outer         = self.conf.getboolean('Mid (Outer) Tags','MidTrim')
-        self.outer_fuzzy        = self.conf.getboolean('Mid (Outer) Tags','MidFuzzyMatching')
-        self.outer_errors = self.conf.getint('Mid (Outer) Tags','MidAllowedErrors')
-        self.inner      = self.conf.getboolean('Linker (Inner) Tags', 'LinkerTrim')
-        self.inner_fuzzy     = self.conf.getboolean('Linker (Inner) Tags','LinkerFuzzyMatching')
-        self.inner_errors = self.conf.getint('Linker (Inner) Tags','LinkerAllowedErrors')
-        self.concat_check    = self.conf.getboolean('Concatemers','ConcatemerChecking')
-        self.concat_fuzzy    = self.conf.getboolean('Concatemers','ConcatemerFuzzyMatching')
+        self.outer            = self.conf.getboolean('OuterTags','MidTrim')
+        self.outer_fuzzy      = self.conf.getboolean('OuterTags','MidFuzzyMatching')
+        self.outer_errors     = self.conf.getint('OuterTags','MidAllowedErrors')
+        self.inner            = self.conf.getboolean('InnerTags', 'LinkerTrim')
+        self.inner_fuzzy      = self.conf.getboolean('InnerTags','LinkerFuzzyMatching')
+        self.inner_errors     = self.conf.getint('InnerTags','LinkerAllowedErrors')
+        self.concat_check     = self.conf.getboolean('Concatemers','ConcatemerChecking')
+        self.concat_fuzzy     = self.conf.getboolean('Concatemers','ConcatemerFuzzyMatching')
         self.concat_allowed_errors   = self.conf.getboolean('Concatemers','ConcatemerAllowedErrors')
-        self.search          = self.conf.get('Search','SearchFor')
+        self.search           = self.conf.get('Search','SearchFor')
         all_outer             = self._get_all_outer()
-        all_inner          = self._get_all_inner()
-        self.sequence_tags   = SequenceTags(all_outer, all_inner, self.search,
-                self.conf.items(self.search), self.conf.getint('Mid (Outer) Tags','MidGap'), 
-                self.conf.getint('Linker (Inner) Tags','LinkerGap'),
+        all_inner             = self._get_all_inner()
+        self.sequence_tags    = SequenceTags(all_outer, all_inner, self.search,
+                self.conf.items(self.search), self.conf.getint('OuterTags','MidGap'), 
+                self.conf.getint('InnerTags','LinkerGap'),
                 self.concat_check)
         self.multiprocessing = conf.get('Multiprocessing', 'Multiprocessing') 
         # compute # cores for computation; leave 1 for db and 1 for sys
@@ -89,15 +89,15 @@ class Parameters():
 
     def _get_all_outer(self):
         # if only linkers, you don't need MIDs
-        if self.search == 'MidGroups' or 'MidLinkerGroups':
-            return dict(self.conf.items('Mids'))
+        if self.search == 'OuterGroups' or 'OuterInnerGroups':
+            return dict(self.conf.items('OuterTagSequences'))
         else:
             return None
 
     def _get_all_inner(self):
         # if only linkers, you don't need MIDs
-        if self.search == 'LinkerGroups' or 'MidLinkerGroups':
-            return dict(self.conf.items('Linkers'))
+        if self.search == 'InnerGroups' or 'OuterInnerGroups':
+            return dict(self.conf.items('InnerTagSequences'))
         else:
             return None
 
@@ -148,7 +148,7 @@ class SequenceTags():
 
         self.cluster_map = defaultdict(lambda : defaultdict(str))
 
-        if search == 'MidLinkerGroups':
+        if search == 'OuterInnerGroups':
             self.outers = defaultdict(list)
             self.inners = defaultdict(lambda : defaultdict(list))
             for row in group:
@@ -172,7 +172,7 @@ class SequenceTags():
                     self._build_regex(self.inners[m]['reverse_string'], 
                     self.inner_gap, rev = True)
 
-        elif search == 'MidGroups':
+        elif search == 'OuterGroups':
             for row in group:
                 self.outers = defaultdict(list)
                 m,l = row[0].replace(' ','').split(',')
@@ -184,7 +184,7 @@ class SequenceTags():
                     self._build_regex(self.outers['forward_string'], 
                     self.outer_gap)
 
-        elif search == 'LinkerGroups':
+        elif search == 'OuterGroups':
             self.inners = defaultdict(lambda : defaultdict(list))
             for row in group:
                 m,l = row[0].replace(' ','').split(',')
@@ -218,10 +218,10 @@ class Tagged():
         assert isinstance(sequence,FastaSequence), \
             'The Record class must be instantiated with a FastaSequence object'
         self.read               = sequence # a biopython sequence object
-        self.outer                = None
-        self.outer_name           = None
-        self.outer_seq            = None
-        self.outer_match          = None
+        self.outer              = None
+        self.outer_name         = None
+        self.outer_seq          = None
+        self.outer_match        = None
         self.outer_type         = None
         self.inner_name         = None
         self.inner_seq          = None
