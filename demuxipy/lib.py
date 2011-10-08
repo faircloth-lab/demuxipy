@@ -73,12 +73,13 @@ class Parameters():
                 self.conf.items(self.search), self.conf.getint('Mid (Outer) Tags','MidGap'), 
                 self.conf.getint('Linker (Inner) Tags','LinkerGap'),
                 self.concat_check)
-
+        self.multiprocessing = conf.get('Multiprocessing', 'Multiprocessing') 
         # compute # cores for computation; leave 1 for db and 1 for sys
-        if conf.get('Multiprocessing','processors').lower() == 'auto' and cpu_count > 2:
-            self.num_procs = cpu_count() - 1
-        elif conf.get('Multiprocessing','processors').lower() != 'auto' and \
-            cpu_count >= conf.getint('Multiprocessing','processors'):
+        if self.multiprocessing == True:
+            if conf.get('Multiprocessing','processors').lower() == 'auto' and cpu_count > 2:
+                self.num_procs = cpu_count() - 1
+            elif conf.get('Multiprocessing','processors').lower() != 'auto' and \
+                    cpu_count >= conf.getint('Multiprocessing','processors'):
                 self.num_procs = conf.getint('Multiprocessing','processors')
         else:
             self.num_procs = 1
