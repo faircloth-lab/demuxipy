@@ -57,19 +57,19 @@ class Parameters():
         self.db               = self.conf.get('Database','DATABASE')
         self.qual_trim        = self.conf.getboolean('Quality', 'QualTrim')
         self.min_qual         = self.conf.getint('Quality', 'MinQualScore')
-        self.mid_trim         = self.conf.getboolean('Mid (Outer) Tags','MidTrim')
-        self.mid_fuzzy        = self.conf.getboolean('Mid (Outer) Tags','MidFuzzyMatching')
-        self.mid_allowed_errors = self.conf.getint('Mid (Outer) Tags','MidAllowedErrors')
-        self.linker_trim      = self.conf.getboolean('Linker (Inner) Tags', 'LinkerTrim')
-        self.linker_fuzzy     = self.conf.getboolean('Linker (Inner) Tags','LinkerFuzzyMatching')
-        self.linker_allowed_errors = self.conf.getint('Linker (Inner) Tags','LinkerAllowedErrors')
+        self.outer         = self.conf.getboolean('Mid (Outer) Tags','MidTrim')
+        self.outer_fuzzy        = self.conf.getboolean('Mid (Outer) Tags','MidFuzzyMatching')
+        self.outer_errors = self.conf.getint('Mid (Outer) Tags','MidAllowedErrors')
+        self.inner      = self.conf.getboolean('Linker (Inner) Tags', 'LinkerTrim')
+        self.inner_fuzzy     = self.conf.getboolean('Linker (Inner) Tags','LinkerFuzzyMatching')
+        self.inner_errors = self.conf.getint('Linker (Inner) Tags','LinkerAllowedErrors')
         self.concat_check    = self.conf.getboolean('Concatemers','ConcatemerChecking')
         self.concat_fuzzy    = self.conf.getboolean('Concatemers','ConcatemerFuzzyMatching')
         self.concat_allowed_errors   = self.conf.getboolean('Concatemers','ConcatemerAllowedErrors')
         self.search          = self.conf.get('Search','SearchFor')
-        all_mids             = self._get_all_mids()
-        all_linkers          = self._get_all_linkers()
-        self.sequence_tags   = SequenceTags(all_mids, all_linkers, self.search,
+        all_outer             = self._get_all_outer()
+        all_inner          = self._get_all_inner()
+        self.sequence_tags   = SequenceTags(all_outer, all_inner, self.search,
                 self.conf.items(self.search), self.conf.getint('Mid (Outer) Tags','MidGap'), 
                 self.conf.getint('Linker (Inner) Tags','LinkerGap'),
                 self.concat_check)
@@ -87,14 +87,14 @@ class Parameters():
     def __repr__(self):
         return '''<linkers.parameters run values>'''
 
-    def _get_all_mids(self):
+    def _get_all_outer(self):
         # if only linkers, you don't need MIDs
         if self.search == 'MidGroups' or 'MidLinkerGroups':
             return dict(self.conf.items('Mids'))
         else:
             return None
 
-    def _get_all_linkers(self):
+    def _get_all_inner(self):
         # if only linkers, you don't need MIDs
         if self.search == 'LinkerGroups' or 'MidLinkerGroups':
             return dict(self.conf.items('Linkers'))
@@ -103,24 +103,24 @@ class Parameters():
 
 class SequenceTags():
     """ """
-    def __init__(self, mids, linkers, search, group, mid_gap, linker_gap,
+    def __init__(self, outers, inners, search, group, outer_gap, inner_gap,
             concat):
-        self.mids = None
-        self.linkers = None
+        self.outers = None
+        self.inners = None
         self.cluster_map = None
         self.all_tags = None
-        self.mid_gap = mid_gap
-        self.linker_gap = linker_gap
-        if mids:
+        self.outer_gap = outer_gap
+        self.inner_gap = inner_gap
+        if outers:
             # map mid sequences to names
-            self.reverse_mid_lookup = self._reverse_dict(mids)
-            self.mid_len = self._get_length(mids)
-        if linkers:
+            self.reverse_outer_lookup = self._reverse_dict(outers)
+            self.outer_len = self._get_length(outers)
+        if inners:
             # map linker sequences to names
-            self.reverse_linker_lookup = self._reverse_dict(linkers)
-            self.linker_len = self._get_length(linkers)
+            self.reverse_inner_lookup = self._reverse_dict(inners)
+            self.inner_len = self._get_length(inners)
         # pare down the list of linkers and MIDS to those we've used
-        self._generate_clusters_and_get_cluster_tags(mids, linkers, search,
+        self._generate_clusters_and_get_cluster_tags(outers, inners, search,
                 group)
         # do we check for concatemers?
         if concat:
@@ -143,62 +143,62 @@ class SequenceTags():
     def _reverse_dict(self, d):
         return {v:k for k,v in d.iteritems()}
 
-    def _generate_clusters_and_get_cluster_tags(self, all_mids, all_linkers, search,
+    def _generate_clusters_and_get_cluster_tags(self, all_outers, all_inners, search,
             group):
 
         self.cluster_map = defaultdict(lambda : defaultdict(str))
 
         if search == 'MidLinkerGroups':
-            self.mids = defaultdict(list)
-            self.linkers = defaultdict(lambda : defaultdict(list))
+            self.outers = defaultdict(list)
+            self.inners = defaultdict(lambda : defaultdict(list))
             for row in group:
                 m,l = row[0].replace(' ','').split(',')
                 org = row[1]
-                self.mids['forward_string'].append(all_mids[m])
+                self.outers['forward_string'].append(all_outers[m])
                 #self.linkers['string'].appendd(all_linkers[l])
-                self.linkers[all_mids[m]]['forward_string'].append(all_linkers[l])
-                self.linkers[all_mids[m]]['reverse_string'].append(DNA_reverse_complement(all_linkers[l]))
-                j = "{},{}".format(all_mids[m],all_linkers[l])
-                self.cluster_map[all_mids[m]][all_linkers[l]] = org
+                self.inners[all_outers[m]]['forward_string'].append(all_inners[l])
+                self.inners[all_outers[m]]['reverse_string'].append(DNA_reverse_complement(all_inners[l]))
+                j = "{},{}".format(all_outers[m],all_inners[l])
+                self.cluster_map[all_outers[m]][all_inners[l]] = org
             
-            self.mids['forward_regex'] = \
-                    self._build_regex(self.mids['forward_string'], 
-                    self.mid_gap)
-            for m in self.linkers:
-                self.linkers[m]['forward_regex'] = \
-                    self._build_regex(self.linkers[m]['forward_string'], 
-                    self.linker_gap)
-                self.linkers[m]['reverse_regex'] = \
-                    self._build_regex(self.linkers[m]['reverse_string'], 
-                    self.linker_gap, rev = True)
+            self.outers['forward_regex'] = \
+                    self._build_regex(self.outers['forward_string'], 
+                    self.outer_gap)
+            for m in self.inners:
+                self.inners[m]['forward_regex'] = \
+                    self._build_regex(self.inners[m]['forward_string'], 
+                    self.inner_gap)
+                self.inners[m]['reverse_regex'] = \
+                    self._build_regex(self.inners[m]['reverse_string'], 
+                    self.inner_gap, rev = True)
 
         elif search == 'MidGroups':
             for row in group:
-                self.mids = defaultdict(list)
+                self.outers = defaultdict(list)
                 m,l = row[0].replace(' ','').split(',')
                 org = row[1]
-                self.mids['forward_string'].append(all_mids[m])
+                self.outers['forward_string'].append(all_outers[m])
                 #self.linkers['string'].append(all_linkers[l])
-                self.cluster_map[all_mids[m]]['None'] = org
-            self.mids['forward_regex'] = \
-                    self._build_regex(self.mids['forward_string'], 
-                    self.mid_gap)
+                self.cluster_map[all_outers[m]]['None'] = org
+            self.outers['forward_regex'] = \
+                    self._build_regex(self.outers['forward_string'], 
+                    self.outer_gap)
 
         elif search == 'LinkerGroups':
-            self.linkers = defaultdict(lambda : defaultdict(list))
+            self.inners = defaultdict(lambda : defaultdict(list))
             for row in group:
                 m,l = row[0].replace(' ','').split(',')
                 org = row[1]
-                self.linkers[str(self.mids)]['forward_string'].append(all_linkers[l])
-                self.linkers[str(self.mids)]['reverse_string'].append(DNA_reverse_complement(all_linkers[l]))
-                self.cluster_map['None'][all_linkers[m]] = org
-            for m in self.linkers:
-                self.linkers[m]['forward_regex'] = \
-                    self._build_regex(self.linkers[m]['forward_string'], 
-                    self.linker_gap)
-                self.linkers[m]['reverse_regex'] = \
-                    self._build_regex(self.linkers[m]['reverse_string'],
-                    self.linker_gap, rev = True)
+                self.linkers[str(self.outers)]['forward_string'].append(all_inners[l])
+                self.linkers[str(self.outers)]['reverse_string'].append(DNA_reverse_complement(all_inners[l]))
+                self.cluster_map['None'][all_inners[m]] = org
+            for m in self.inners:
+                self.inners[m]['forward_regex'] = \
+                    self._build_regex(self.inners[m]['forward_string'], 
+                    self.inner_gap)
+                self.inners[m]['reverse_regex'] = \
+                    self._build_regex(self.inners[m]['reverse_string'],
+                    self.inner_gap, rev = True)
         #pdb.set_trace()
 
     def _all_possible_tags(self, search):
@@ -206,8 +206,8 @@ class SequenceTags():
         of all of the tags sequences used in a run'''
         # at = all tags; rat = reverse complement all tags
         self.all_tags = defaultdict(lambda : defaultdict())
-        for m in self.linkers:
-            self.all_tags[m]['string'] = self.linkers[m]['forward_string'] + self.linkers[m]['reverse_string']
+        for m in self.inners:
+            self.all_tags[m]['string'] = self.inners[m]['forward_string'] + self.inners[m]['reverse_string']
             self.all_tags[m]['regex'] = [re.compile(t) for t in
                     self.all_tags[m]['string']]
 
@@ -218,22 +218,19 @@ class Tagged():
         assert isinstance(sequence,FastaSequence), \
             'The Record class must be instantiated with a FastaSequence object'
         self.read               = sequence # a biopython sequence object
-        self.mid                = None
-        self.mid_name           = None
-        self.mid_seq            = None
-        self.seq_match          = None
-        self.m_type             = None
-        self.l_seq              = None
-        self.l_tag              = None
-        self.l_name             = None
-        self.l_seq_match        = None
-        self.l_critter          = None
-        self.l_m_type           = None
-        self.concat_tag         = None
-        self.concat_m_type      = None
-        self.concat_seq_type    = None
-        self.concat_count       = None
-        self.concat_seq_match   = None
+        self.outer                = None
+        self.outer_name           = None
+        self.outer_seq            = None
+        self.outer_match          = None
+        self.outer_type         = None
+        self.inner_name         = None
+        self.inner_seq          = None
+        self.inner_match        = None
+        self.inner_type         = None
+        self.cluster            = None
+        self.concat_seq         = None
+        self.concat_type        = None
+        self.concat_match       = None
     
     #def __repr__(self):
     #    return '''<linkers.record for %s>''' % self.identifier

@@ -86,18 +86,18 @@ def insert_record_to_db(cur, tagged):
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''', 
         (
             name,
-            tagged.mid_name,
-            tagged.mid,
-            tagged.seq_match,
-            tagged.m_type,
-            tagged.l_name,
-            tagged.l_tag,
-            tagged.l_seq_match,
-            tagged.l_m_type,
-            tagged.l_critter,
-            tagged.concat_tag,
-            tagged.concat_seq_match,
-            tagged.concat_m_type
+            tagged.outer_name,
+            tagged.outer_seq,
+            tagged.outer_match,
+            tagged.outer_type,
+            tagged.inner_name,
+            tagged.inner_seq,
+            tagged.inner_match,
+            tagged.inner_type,
+            tagged.cluster,
+            tagged.concat_seq,
+            tagged.concat_match,
+            tagged.concat_type
         )
     )
     key = cur.lastrowid

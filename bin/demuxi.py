@@ -251,7 +251,6 @@ def find_and_trim_linkers(tagged, fregex, fstring, rregex, rstring, buff,
         match_type = "{}-right".format(right[1])
 
     else:
-        trimmed = None
         target, match_type, match = None, None, None
 
     return tagged, target, match, match_type
@@ -262,22 +261,22 @@ def concat_check(tagged, params):
     s = tagged.read.sequence
     m_type = None
     #pdb.set_trace()
-    for tag in params.sequence_tags.all_tags[str(tagged.mid)]['regex']:
+    for tag in params.sequence_tags.all_tags[str(tagged.outer_seq)]['regex']:
         match = tag.search(s)
         if match:
-            tagged.concat_tag= tag.pattern
-            tagged.concat_m_type = "regex-concat"
-            tagged.concat_seq_match = tagged.read.sequence[match.start():match.end()]
+            tagged.concat_seq = tag.pattern
+            tagged.concat_type = "regex-concat"
+            tagged.concat_match = tagged.read.sequence[match.start():match.end()]
             break
     if match is None and params.concat_fuzzy:
         match = align(s,
-                params.sequence_tags.all_tags[str(tagged.mid)]['string'], 
+                params.sequence_tags.all_tags[str(tagged.outer_seq)]['string'], 
                 params.concat_allowed_errors
             )
         if match:
-            tagged.concat_tag = match[0]
-            tagged.concat_m_type = "fuzzy-concat"
-            tagged.concat_seq_match = match[3]
+            tagged.concat_seq = match[0]
+            tagged.concat_type = "fuzzy-concat"
+            tagged.concat_match = match[3]
     return tagged
 
 def progress(count, interval, big_interval):
@@ -300,44 +299,46 @@ def singleproc(job, results, params, interval = 1000, big_interval = 10000):
             tagged.read = tagged.read.trim(params.min_qual, False)
 
         # check for MIDs
-        if params.mid_trim:
+        if params.outer:
             result = trim_one(tagged,
-                    params.sequence_tags.mids['forward_regex'], 
-                    params.sequence_tags.mids['forward_string'],
-                    params.sequence_tags.mid_gap,
-                    params.sequence_tags.mid_len,
-                    params.mid_fuzzy,
-                    params.mid_allowed_errors
+                    params.sequence_tags.outers['forward_regex'], 
+                    params.sequence_tags.outers['forward_string'],
+                    params.sequence_tags.outer_gap,
+                    params.sequence_tags.outer_len,
+                    params.outer_fuzzy,
+                    params.outer_errors
                 )
-            tagged, tagged.mid, tagged.m_type, tagged.seq_match = result
+            tagged, tagged.outer_seq, tagged.outer_type, tagged.outer_match = result
             # lookup the outer tag name
-            if tagged.mid:
-                tagged.mid_name = params.sequence_tags.reverse_mid_lookup[tagged.mid]
+            if tagged.outer_seq:
+                tagged.outer_name = params.sequence_tags.reverse_outer_lookup[tagged.outer_seq]
+                
 
         # check for linkers
-        if (params.linker_trim and tagged.mid and params.search == 'MidLinkerGroups') or \
-                (params.linker_trim and params.search == 'LinkerGroups'):
+        if (params.inner and tagged.outer_seq and params.search == 'MidLinkerGroups') or \
+                (params.inner and params.search == 'LinkerGroups'):
             result = find_and_trim_linkers(tagged, 
-                    params.sequence_tags.linkers[tagged.mid]['forward_regex'],
-                    params.sequence_tags.linkers[tagged.mid]['forward_string'],
-                    params.sequence_tags.linkers[tagged.mid]['reverse_regex'],
-                    params.sequence_tags.linkers[tagged.mid]['reverse_string'],
-                    params.sequence_tags.linker_gap,
-                    params.sequence_tags.linker_len,
-                    params.linker_fuzzy,
-                    params.linker_allowed_errors,
+                    params.sequence_tags.inners[tagged.outer_seq]['forward_regex'],
+                    params.sequence_tags.inners[tagged.outer_seq]['forward_string'],
+                    params.sequence_tags.inners[tagged.outer_seq]['reverse_regex'],
+                    params.sequence_tags.inners[tagged.outer_seq]['reverse_string'],
+                    params.sequence_tags.inner_gap,
+                    params.sequence_tags.inner_len,
+                    params.inner_fuzzy,
+                    params.inner_errors,
                 )
-            tagged, tagged.l_tag, tagged.l_seq_match, tagged.l_m_type = result
-            if tagged.l_tag:
-                tagged.l_critter = params.sequence_tags.cluster_map[str(tagged.mid)][str(tagged.l_tag)]
-                tagged.l_name = params.sequence_tags.reverse_linker_lookup[tagged.l_tag]
-
+            tagged, tagged.inner_seq, tagged.inner_match, tagged.inner_type = result
+            if tagged.inner_seq:
+                tagged.inner_name = params.sequence_tags.reverse_inner_lookup[tagged.inner_seq]
+        
+        # lookup cluster name; should => None, None is no outers or inners
+        tagged.cluster = params.sequence_tags.cluster_map[str(tagged.outer_seq)][str(tagged.inner_seq)]
 
         # check for concatemers
         if (params.concat_check and len(tagged.read.sequence) > 0) and \
-                ((tagged.mid and tagged.l_tag and params.search == 'MidLinkerGroups') or \
-                (tagged.mid and params.search == 'MidGroups') or \
-                (tagged.l_tag and params.search == 'LinkerGroups')):
+                ((tagged.outer_seq and tagged.inner_seq and params.search == 'MidLinkerGroups') or \
+                (tagged.outer_seq and params.search == 'MidGroups') or \
+                (tagged.inner_seq and params.search == 'LinkerGroups')):
             tagged = concat_check(tagged, params)
 
         count += 1
