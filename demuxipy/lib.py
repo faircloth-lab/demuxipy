@@ -57,22 +57,40 @@ class Parameters():
         self.db               = self.conf.get('Database','DATABASE')
         self.qual_trim        = self.conf.getboolean('Quality', 'QualTrim')
         self.min_qual         = self.conf.getint('Quality', 'MinQualScore')
-        self.outer            = self.conf.getboolean('OuterTags','MidTrim')
-        self.outer_fuzzy      = self.conf.getboolean('OuterTags','MidFuzzyMatching')
-        self.outer_errors     = self.conf.getint('OuterTags','MidAllowedErrors')
-        self.inner            = self.conf.getboolean('InnerTags', 'LinkerTrim')
-        self.inner_fuzzy      = self.conf.getboolean('InnerTags','LinkerFuzzyMatching')
-        self.inner_errors     = self.conf.getint('InnerTags','LinkerAllowedErrors')
+        self.outer            = self.conf.getboolean('OuterTags','Search')
+        self.outer_type       = self.conf.get('OuterTags','TrimType')
+        self.outer_buffer     = self.conf.getint('OuterTags','Buffer')
+        self.outer_orientation = self.conf.get('OuterTags','ThreePrimeOrientation')
+        self.outer_trim       = self.conf.getint('OuterTags','Trim')
+        self.outer_fuzzy      = self.conf.getboolean('OuterTags','FuzzyMatching')
+        self.outer_errors     = self.conf.getint('OuterTags','AllowedErrors')
+        self.inner            = self.conf.getboolean('InnerTags', 'Search')
+        self.inner_type       = self.conf.get('InnerTags','TrimType')
+        self.inner_buffer     = self.conf.getint('InnerTags','Buffer')
+        self.inner_orientation = self.conf.get('InnerTags','ThreePrimeOrientation')
+        self.inner_trim       = self.conf.getint('InnerTags','Trim')
+        self.inner_fuzzy      = self.conf.getboolean('InnerTags','FuzzyMatching')
+        self.inner_errors     = self.conf.getint('InnerTags','AllowedErrors')
         self.concat_check     = self.conf.getboolean('Concatemers','ConcatemerChecking')
         self.concat_fuzzy     = self.conf.getboolean('Concatemers','ConcatemerFuzzyMatching')
         self.concat_allowed_errors   = self.conf.getboolean('Concatemers','ConcatemerAllowedErrors')
         self.search           = self.conf.get('Search','SearchFor')
         all_outer             = self._get_all_outer()
         all_inner             = self._get_all_inner()
-        self.sequence_tags    = SequenceTags(all_outer, all_inner, self.search,
-                self.conf.items(self.search), self.conf.getint('OuterTags','MidGap'), 
-                self.conf.getint('InnerTags','LinkerGap'),
-                self.concat_check)
+        self._check_values()
+        self.sequence_tags    = SequenceTags(
+                all_outer,
+                all_inner,
+                self.search,
+                self.conf.items(self.search),
+                self.outer_buffer,
+                self.inner_buffer,
+                self.concat_check,
+                self.outer_type,
+                self.outer_orientation,
+                self.inner_type,
+                self.inner_orientation
+            )
         self.multiprocessing = conf.get('Multiprocessing', 'Multiprocessing') 
         # compute # cores for computation; leave 1 for db and 1 for sys
         if self.multiprocessing == True:
@@ -101,27 +119,41 @@ class Parameters():
         else:
             return None
 
+    def _check_values(self):
+        assert self.outer_type.lower() in ['single','both'], \
+                "Outer type must be one of ['Single','Both']"
+        assert self.outer_orientation.lower() in ['reverse','forward'], \
+                "Outer type must be one of ['Single','Both']"
+        assert self.inner_type.lower() in ['single','both'], \
+                "Outer type must be one of ['Single','Both']"
+        assert self.inner_orientation.lower() in ['reverse','forward'], \
+                "Outer type must be one of ['Single','Both']"
+        assert self.search.lower() in \
+                ['innergroups','outergroups','outerinnergroups'], \
+                "SearchFor must be one of ['InnerGroups','OuterGroups'," +\
+                "'OuterInnerGroups']"
+
 class SequenceTags():
     """ """
-    def __init__(self, outers, inners, search, group, outer_gap, inner_gap,
-            concat):
+    def __init__(self, all_outers, all_inners, search, group, outer_gap, inner_gap,
+            concat, o_type, o_orientation, i_type, i_orientation):
         self.outers = None
         self.inners = None
         self.cluster_map = None
         self.all_tags = None
         self.outer_gap = outer_gap
         self.inner_gap = inner_gap
-        if outers:
+        if all_outers:
             # map mid sequences to names
-            self.reverse_outer_lookup = self._reverse_dict(outers)
-            self.outer_len = self._get_length(outers)
-        if inners:
+            self.reverse_outer_lookup = self._reverse_dict(all_outers)
+            self.outer_len = self._get_length(all_outers)
+        if all_inners:
             # map linker sequences to names
-            self.reverse_inner_lookup = self._reverse_dict(inners)
-            self.inner_len = self._get_length(inners)
+            self.reverse_inner_lookup = self._reverse_dict(all_inners)
+            self.inner_len = self._get_length(all_inners)
         # pare down the list of linkers and MIDS to those we've used
-        self._generate_clusters_and_get_cluster_tags(outers, inners, search,
-                group)
+        self._generate_clusters_and_get_cluster_tags(all_outers, all_inners, search,
+                group, o_type, o_orientation, i_type, i_orientation)
         # do we check for concatemers?
         if concat:
             self._all_possible_tags(search)
@@ -143,63 +175,103 @@ class SequenceTags():
     def _reverse_dict(self, d):
         return {v:k for k,v in d.iteritems()}
 
-    def _generate_clusters_and_get_cluster_tags(self, all_outers, all_inners, search,
-            group):
+    def _generate_outer_regex(self, outer_type):
+        # compile regular expressions:
+        self.outers['forward_regex'] = \
+                self._build_regex(self.outers['forward_string'], 
+                self.outer_gap)
+        if outer_type.lower() == 'both':
+            self.outers['reverse_regex'] = \
+                    self._build_regex(self.outers['reverse_string'], 
+                    self.outer_gap, rev = True)
 
-        self.cluster_map = defaultdict(lambda : defaultdict(str))
-
-        if search == 'OuterInnerGroups':
-            self.outers = defaultdict(list)
-            self.inners = defaultdict(lambda : defaultdict(list))
-            for row in group:
-                m,l = row[0].replace(' ','').split(',')
-                org = row[1]
-                self.outers['forward_string'].append(all_outers[m])
-                #self.linkers['string'].appendd(all_linkers[l])
-                self.inners[all_outers[m]]['forward_string'].append(all_inners[l])
-                self.inners[all_outers[m]]['reverse_string'].append(DNA_reverse_complement(all_inners[l]))
-                j = "{},{}".format(all_outers[m],all_inners[l])
-                self.cluster_map[all_outers[m]][all_inners[l]] = org
-            
-            self.outers['forward_regex'] = \
-                    self._build_regex(self.outers['forward_string'], 
-                    self.outer_gap)
-            for m in self.inners:
-                self.inners[m]['forward_regex'] = \
-                    self._build_regex(self.inners[m]['forward_string'], 
-                    self.inner_gap)
+    def _generate_inner_regex(self, inner_type):
+        for m in self.inners:
+            self.inners[m]['forward_regex'] = \
+                self._build_regex(self.inners[m]['forward_string'], 
+                self.inner_gap)
+            if inner_type.lower() == 'both':
                 self.inners[m]['reverse_regex'] = \
                     self._build_regex(self.inners[m]['reverse_string'], 
                     self.inner_gap, rev = True)
 
-        elif search == 'OuterGroups':
-            for row in group:
-                self.outers = defaultdict(list)
-                m,l = row[0].replace(' ','').split(',')
-                org = row[1]
-                self.outers['forward_string'].append(all_outers[m])
-                #self.linkers['string'].append(all_linkers[l])
-                self.cluster_map[all_outers[m]]['None'] = org
-            self.outers['forward_regex'] = \
-                    self._build_regex(self.outers['forward_string'], 
-                    self.outer_gap)
+    def _generate_outer_reverse_strings(self, m, outer_type, outer_orientation):
+        if outer_type.lower() == 'both':
+            if outer_orientation.lower() == 'reverse':
+                self.outers['reverse_string'].append(DNA_reverse_complement(m))
+            else:
+                self.outers['reverse_string'].append(m)
+
+    def _generate_inner_reverse_strings(self, m, l, inner_type,
+            inner_orientation):
+        if inner_type.lower() == 'both':
+            if inner_orientation.lower() == 'reverse':
+                self.inners[m]['reverse_string'].append(DNA_reverse_complement(l))
+            else:
+                # reverse orientation really == forward orientation
+                self.inners[m]['reverse_string'].append(l)
+
+    def _parse_group(self, row):
+        m,l = row[0].replace(' ','').split(',')
+        org = row[1]
+        return m, l, org
+
+    def _generate_outer_inner_groups(self, all_outers, all_inners, group,
+            o_type, o_orientation, i_type, i_orientation):
+        self.outers = defaultdict(list)
+        self.inners = defaultdict(lambda : defaultdict(list))
+        for row in group:
+            m, l, org = self._parse_group(row)
+            self.outers['forward_string'].append(all_outers[m])
+            self._generate_outer_reverse_strings(all_outers[m],
+                    o_type, o_orientation)
+            self.inners[all_outers[m]]['forward_string'].append(all_inners[l])
+            self._generate_inner_reverse_strings(all_outers[m],
+                    all_inners[l], i_type, i_orientation)
+            self.cluster_map[all_outers[m]][all_inners[l]] = org
+        # compile regular expressions for outers and inners
+        self._generate_outer_regex(o_type)
+        self._generate_inner_regex(i_type)
+
+    def _generate_outer_groups(self, all_outers, group, o_type, o_orientation):
+        for row in group:
+            self.outers = defaultdict(list)
+            m, l, org = self._parse_group(row)
+            self.outers['forward_string'].append(all_outers[m])
+            self._generate_outer_reverse_strings(all_outers[m], o_type,
+                    o_orientation)
+            self.cluster_map[all_outers[m]]['None'] = org
+        # compile regular expressions for outers
+        self._generate_outer_regex(o_type)
+
+    def _generate_inner_groups(self, all_inners, group, i_type, i_orientation):
+        self.inners = defaultdict(lambda : defaultdict(list))
+        for row in group:
+            m, l, org = self._parse_group(row)
+            self.inners[str(self.outers)]['forward_string'].append(all_inners[l])
+            #self.inners[str(self.outers)]['reverse_string'].append(DNA_reverse_complement(all_inners[l]))
+            self._generate_inner_reverse_strings(None, all_inners[l],
+                    i_type, i_orientation)
+            self.cluster_map['None'][all_inners[m]] = org
+        # compile regular expressions for inners
+        self._generate_inner_regex(o_type)
+
+    def _generate_clusters_and_get_cluster_tags(self, all_outers, all_inners, search,
+            group, o_type, o_orientation, i_type, i_orientation):
+
+        self.cluster_map = defaultdict(lambda : defaultdict(str))
+
+        if search == 'OuterInnerGroups':
+            self._generate_outer_inner_groups(all_outers, all_inners, group,
+                    o_type, o_orientation, i_type, i_orientation)
 
         elif search == 'OuterGroups':
-            self.inners = defaultdict(lambda : defaultdict(list))
-            for row in group:
-                m,l = row[0].replace(' ','').split(',')
-                org = row[1]
-                self.linkers[str(self.outers)]['forward_string'].append(all_inners[l])
-                self.linkers[str(self.outers)]['reverse_string'].append(DNA_reverse_complement(all_inners[l]))
-                self.cluster_map['None'][all_inners[m]] = org
-            for m in self.inners:
-                self.inners[m]['forward_regex'] = \
-                    self._build_regex(self.inners[m]['forward_string'], 
-                    self.inner_gap)
-                self.inners[m]['reverse_regex'] = \
-                    self._build_regex(self.inners[m]['reverse_string'],
-                    self.inner_gap, rev = True)
-        #pdb.set_trace()
+            self._generate_outer_groups(all_outers, group, o_type,
+                    o_orientation)
+
+        elif search == 'InnerGroups':
+            self._generate_inner_groups(all_inners, group, i_type,
+                    i_orientation)
 
     def _all_possible_tags(self, search):
         '''Create regular expressions for the forward and reverse complements
