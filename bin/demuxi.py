@@ -172,6 +172,7 @@ def trim_one(tagged, regexes, strings, buff, length, fuzzy, errors, trim = 0):
     """Remove the MID tag from the sequence read"""
     #if sequence.id == 'MID_No_Error_ATACGACGTA':
     #    pdb.set_trace()
+    #pdb.set_trace()
     mid = find_left_tag(tagged.read.sequence,
                 regexes,
                 strings,
@@ -189,8 +190,8 @@ def trim_one(tagged, regexes, strings, buff, length, fuzzy, errors, trim = 0):
     else:
         return tagged, None, None, None
 
-def find_and_trim_linkers(tagged, fregex, fstring, rregex, rstring, buff,
-        length, fuzzy, errors, trim = 0):
+def trim_two(tagged, fregex, fstring, rregex, rstring, buff,
+        length, fuzzy, errors, trim = 0, revcomp = True):
     """Use regular expression and (optionally) fuzzy string matching
     to locate and trim linkers from sequences"""
 
@@ -210,7 +211,8 @@ def find_and_trim_linkers(tagged, fregex, fstring, rregex, rstring, buff,
                 length,
                 fuzzy,
                 errors,
-                tagged
+                tagged,
+                revcomp
             )
 
     # we can have 5 types of matches - tags on left and right sides,
@@ -253,7 +255,7 @@ def find_and_trim_linkers(tagged, fregex, fstring, rregex, rstring, buff,
     else:
         target, match_type, match = None, None, None
 
-    return tagged, target, match, match_type
+    return tagged, target, match_type, match
 
 def concat_check(tagged, params):
     """Check screened sequence for the presence of concatemers by scanning 
@@ -298,9 +300,13 @@ def singleproc(job, results, params, interval = 1000, big_interval = 10000):
             #pdb.set_trace()
             tagged.read = tagged.read.trim(params.min_qual, False)
 
-        # check for MIDs
-        if params.outer:
-            result = trim_one(tagged,
+        # check for Outers:
+        #pdb.set_trace()
+        if (params.search == 'OuterGroups' or params.search ==
+                'OuterInnerGroups'):
+            assert params.outer, "Search != True for Outer tags"
+            if params.outer_type.lower() == 'single':
+                result = trim_one(tagged,
                     params.sequence_tags.outers['forward_regex'], 
                     params.sequence_tags.outers['forward_string'],
                     params.sequence_tags.outer_gap,
@@ -308,16 +314,49 @@ def singleproc(job, results, params, interval = 1000, big_interval = 10000):
                     params.outer_fuzzy,
                     params.outer_errors
                 )
-            tagged, tagged.outer_seq, tagged.outer_type, tagged.outer_match = result
-            # lookup the outer tag name
-            if tagged.outer_seq:
-                tagged.outer_name = params.sequence_tags.reverse_outer_lookup[tagged.outer_seq]
-                
-
+            elif params.outer_type.lower() == 'both':
+                if params.outer_orientation.lower() == 'reverse':
+                    revcomp = True
+                else:
+                    revcomp = False
+                result = trim_two(tagged,
+                    params.sequence_tags.outers['forward_regex'],
+                    params.sequence_tags.outers['forward_string'],
+                    params.sequence_tags.outers['reverse_regex'],
+                    params.sequence_tags.outers['reverse_string'],
+                    params.sequence_tags.outer_gap,
+                    params.sequence_tags.outer_len,
+                    params.outer_fuzzy,
+                    params.outer_errors,
+                    revcomp
+                )
+        tagged, tagged.outer_seq, tagged.outer_type, \
+                tagged.outer_match = result
+        if tagged.outer_seq:
+            tagged.outer_name = params.sequence_tags.reverse_outer_lookup[tagged.outer_seq]
+        else:
+            tagged.outer_name = str(tagged.outer_seq)
         # check for linkers
-        if (params.inner and tagged.outer_seq and params.search == 'OuterInnerGroups') or \
-                (params.inner and params.search == 'OuterGroups'):
-            result = find_and_trim_linkers(tagged, 
+        if (tagged.outer_seq and params.search == 'OuterInnerGroups' \
+                    or params.search == 'InnerGroups'):
+            assert params.inner, "Search != for Inner tags."
+            if params.inner_type.lower() == 'single':
+                result = trim_one(tagged, 
+                    params.sequence_tags.inners[tagged.outer_seq]['forward_regex'],
+                    params.sequence_tags.inners[tagged.outer_seq]['forward_string'],
+                    params.sequence_tags.inners[tagged.outer_seq]['reverse_regex'],
+                    params.sequence_tags.inners[tagged.outer_seq]['reverse_string'],
+                    params.sequence_tags.inner_gap,
+                    params.sequence_tags.inner_len,
+                    params.inner_fuzzy,
+                    params.inner_errors
+                )
+            elif params.inner_type.lower() == 'both':
+                if params.outer_orientation.lower() == 'reverse':
+                    revcomp = True
+                else:
+                    revcomp = False
+                result = trim_two(tagged, 
                     params.sequence_tags.inners[tagged.outer_seq]['forward_regex'],
                     params.sequence_tags.inners[tagged.outer_seq]['forward_string'],
                     params.sequence_tags.inners[tagged.outer_seq]['reverse_regex'],
@@ -326,11 +365,15 @@ def singleproc(job, results, params, interval = 1000, big_interval = 10000):
                     params.sequence_tags.inner_len,
                     params.inner_fuzzy,
                     params.inner_errors,
+                    revcomp
                 )
-            tagged, tagged.inner_seq, tagged.inner_match, tagged.inner_type = result
+            tagged, tagged.inner_seq, tagged.inner_type, \
+                    tagged.inner_match = result
             if tagged.inner_seq:
                 tagged.inner_name = params.sequence_tags.reverse_inner_lookup[tagged.inner_seq]
-        
+            else:
+                tagged.inner_seq = str(tagged.outer_seq)
+
         # lookup cluster name; should => None, None is no outers or inners
         tagged.cluster = params.sequence_tags.cluster_map[str(tagged.outer_seq)][str(tagged.inner_seq)]
 
