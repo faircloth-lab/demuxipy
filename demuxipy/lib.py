@@ -16,7 +16,8 @@ import ConfigParser
 from collections import defaultdict
 from multiprocessing import cpu_count
 from seqtools.sequence.fasta import FastaSequence
-from seqtools.sequence.transform import DNA_reverse_complement
+from seqtools.sequence.transform import DNA_reverse_complement, DNA_complement
+from seqtools.sequence.transform import reverse as DNA_reverse
 
 import pdb
 
@@ -75,22 +76,12 @@ class Parameters():
         self.concat_fuzzy     = self.conf.getboolean('Concatemers','ConcatemerFuzzyMatching')
         self.concat_allowed_errors   = self.conf.getboolean('Concatemers','ConcatemerAllowedErrors')
         self.search           = self.conf.get('Search','SearchFor')
-        all_outer             = self._get_all_outer()
-        all_inner             = self._get_all_inner()
+        #all_outer             = self._get_all_outer()
+        #all_inner             = self._get_all_inner()
         self._check_values()
-        self.sequence_tags    = SequenceTags(
-                all_outer,
-                all_inner,
-                self.search,
-                self.conf.items(self.search),
-                self.outer_buffer,
-                self.inner_buffer,
-                self.concat_check,
-                self.outer_type,
-                self.outer_orientation,
-                self.inner_type,
-                self.inner_orientation
-            )
+        self.sequence_tags    = self._get_sequence_tags(self._get_all_outer(), 
+                self._get_all_inner())
+        
         self.multiprocessing = conf.get('Multiprocessing', 'Multiprocessing') 
         # compute # cores for computation; leave 1 for db and 1 for sys
         if self.multiprocessing == True:
@@ -107,17 +98,34 @@ class Parameters():
 
     def _get_all_outer(self):
         # if only linkers, you don't need MIDs
-        if self.search == 'OuterGroups' or 'OuterInnerGroups':
+        if self.search.lower() in ['outergroups','outerinnergroups',
+                'outercombinatorial']:
             return dict(self.conf.items('OuterTagSequences'))
         else:
             return None
 
     def _get_all_inner(self):
         # if only linkers, you don't need MIDs
-        if self.search == 'InnerGroups' or 'OuterInnerGroups':
+        if self.search.lower() in ['innergroups','outerinnergroups',
+                'innercombinatorial']:
             return dict(self.conf.items('InnerTagSequences'))
         else:
             return None
+
+    def _get_sequence_tags(self, all_outer, all_inner):
+        return SequenceTags(
+                all_outer,
+                all_inner,
+                self.search,
+                self.conf.items(self.search),
+                self.outer_buffer,
+                self.inner_buffer,
+                self.concat_check,
+                self.outer_type,
+                self.outer_orientation,
+                self.inner_type,
+                self.inner_orientation
+            )
 
     def _check_values(self):
         assert self.outer_type.lower() in ['single','both'], \
@@ -198,18 +206,18 @@ class SequenceTags():
     def _generate_outer_reverse_strings(self, m, outer_type, outer_orientation):
         if outer_type.lower() == 'both':
             if outer_orientation.lower() == 'reverse':
-                self.outers['reverse_string'].append(DNA_reverse_complement(m))
+                self.outers['reverse_string'].add(DNA_reverse_complement(m))
             else:
-                self.outers['reverse_string'].append(m)
+                self.outers['reverse_string'].add(m)
 
     def _generate_inner_reverse_strings(self, m, l, inner_type,
             inner_orientation):
         if inner_type.lower() == 'both':
             if inner_orientation.lower() == 'reverse':
-                self.inners[m]['reverse_string'].append(DNA_reverse_complement(l))
+                self.inners[str(m)]['reverse_string'].add(DNA_reverse_complement(l))
             else:
                 # reverse orientation really == forward orientation
-                self.inners[m]['reverse_string'].append(l)
+                self.inners[str(m)]['reverse_string'].add(l)
 
     def _parse_group(self, row):
         m,l = row[0].replace(' ','').split(',')
@@ -218,14 +226,14 @@ class SequenceTags():
 
     def _generate_outer_inner_groups(self, all_outers, all_inners, group,
             o_type, o_orientation, i_type, i_orientation):
-        self.outers = defaultdict(list)
-        self.inners = defaultdict(lambda : defaultdict(list))
+        self.outers = defaultdict(set)
+        self.inners = defaultdict(lambda : defaultdict(set))
         for row in group:
             m, l, org = self._parse_group(row)
-            self.outers['forward_string'].append(all_outers[m])
+            self.outers['forward_string'].add(all_outers[m])
             self._generate_outer_reverse_strings(all_outers[m],
                     o_type, o_orientation)
-            self.inners[all_outers[m]]['forward_string'].append(all_inners[l])
+            self.inners[all_outers[m]]['forward_string'].add(all_inners[l])
             self._generate_inner_reverse_strings(all_outers[m],
                     all_inners[l], i_type, i_orientation)
             self.cluster_map[all_outers[m]][all_inners[l]] = org
@@ -235,9 +243,9 @@ class SequenceTags():
 
     def _generate_outer_groups(self, all_outers, group, o_type, o_orientation):
         for row in group:
-            self.outers = defaultdict(list)
+            self.outers = defaultdict(set)
             m, l, org = self._parse_group(row)
-            self.outers['forward_string'].append(all_outers[m])
+            self.outers['forward_string'].add(all_outers[m])
             self._generate_outer_reverse_strings(all_outers[m], o_type,
                     o_orientation)
             self.cluster_map[all_outers[m]]['None'] = org
@@ -245,16 +253,47 @@ class SequenceTags():
         self._generate_outer_regex(o_type)
 
     def _generate_inner_groups(self, all_inners, group, i_type, i_orientation):
-        self.inners = defaultdict(lambda : defaultdict(list))
+        self.inners = defaultdict(lambda : defaultdict(set))
         for row in group:
             m, l, org = self._parse_group(row)
-            self.inners[str(self.outers)]['forward_string'].append(all_inners[l])
-            #self.inners[str(self.outers)]['reverse_string'].append(DNA_reverse_complement(all_inners[l]))
+            self.inners[str(self.outers)]['forward_string'].add(all_inners[l])
             self._generate_inner_reverse_strings(None, all_inners[l],
                     i_type, i_orientation)
-            self.cluster_map['None'][all_inners[m]] = org
+            self.cluster_map['None'][all_inners[l]] = org
         # compile regular expressions for inners
-        self._generate_inner_regex(o_type)
+        self._generate_inner_regex(i_type)
+
+    def _make_combinatorial_cluster_map(self, ll, rl, typ, orientation, org):
+        if orientation.lower() == 'reverse':
+            name1 = "{},{}".format(ll, DNA_reverse_complement(rl))
+            if typ.lower() == 'both':
+                name2 = "{},{}".format(DNA_complement(ll), DNA_reverse(rl))
+            else:
+                name2 = None
+        else:
+            name1 = "{},{}".format(ll,rl)
+            if typ.lower() == 'both':
+                name2 = "{},{}".format(DNA_complement(ll),
+                        DNA_complement(rl))
+            else:
+                name2 = None
+        for n in [name1, name2]:
+            if n is not None:
+                self.cluster_map['None'][n] = org
+
+    def _generate_inner_combinatorial_groups(self, all_inners, group,
+            i_type, i_orientation):
+        self.inners = defaultdict(lambda: defaultdict(set))
+        for row in group:
+            ll, rl, org = self._parse_group(row)
+            for v in [ll,rl]:
+                self.inners[str(self.outers)]['forward_string'].add(all_inners[v])
+                self._generate_inner_reverse_strings(None, all_inners[v],
+                    i_type, i_orientation)
+            self._make_combinatorial_cluster_map(all_inners[ll], all_inners[rl],
+                    i_type, i_orientation, org)
+        self._generate_inner_regex(i_type)
+
 
     def _generate_clusters_and_get_cluster_tags(self, all_outers, all_inners, search,
             group, o_type, o_orientation, i_type, i_orientation):
@@ -273,13 +312,21 @@ class SequenceTags():
             self._generate_inner_groups(all_inners, group, i_type,
                     i_orientation)
 
+        elif search == 'InnerCombinatorial':
+            self._generate_inner_combinatorial_groups(all_inners, group,
+                    i_type, i_orientation)
+
+        elif search == 'HierarchicalCombinatorial':
+            pass
+
     def _all_possible_tags(self, search):
         '''Create regular expressions for the forward and reverse complements
         of all of the tags sequences used in a run'''
         # at = all tags; rat = reverse complement all tags
         self.all_tags = defaultdict(lambda : defaultdict())
         for m in self.inners:
-            self.all_tags[m]['string'] = self.inners[m]['forward_string'] + self.inners[m]['reverse_string']
+            self.all_tags[m]['string'] = \
+                    self.inners[m]['forward_string'].union(self.inners[m]['reverse_string'])
             self.all_tags[m]['regex'] = [re.compile(t) for t in
                     self.all_tags[m]['string']]
 
