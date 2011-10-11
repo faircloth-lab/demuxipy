@@ -300,14 +300,31 @@ class SequenceTags:
             i_type, i_orientation):
         self.inners = defaultdict(lambda: defaultdict(set))
         for row in group:
-            ll, rl, org = self._parse_group(row)
-            for v in [ll,rl]:
-                self.inners[str(self.outers)]['forward_string'].add(all_inners[v])
-                self._generate_inner_reverse_strings(None, all_inners[v],
+            m, l, org = self._parse_group(row)
+            self.inners[str(self.outers)]['forward_string'].add(all_inners[m])
+            self._generate_inner_reverse_strings(None, all_inners[l],
                     i_type, i_orientation)
-            self._make_combinatorial_cluster_map(all_inners[ll], all_inners[rl],
+            self._make_combinatorial_cluster_map(all_inners[m], all_inners[l],
                     i_type, i_orientation, org)
+        # compile regular expressions for combinatorial inners
         self._generate_inner_regex(i_type)
+
+    def _generate_outer_combinatorial_groups(self, all_outers, group, o_type,
+            o_orientation):
+        self.outers = defaultdict(set)
+        for row in group:
+            m, l, org = self._parse_group(row)
+            #pdb.set_trace()
+            self.outers['forward_string'].add(all_outers[m])
+            self._generate_outer_reverse_strings(all_outers[l], o_type,
+                    o_orientation)
+            self._make_combinatorial_cluster_map(all_outers[m], all_outers[l],
+                    o_type, o_orientation, org)
+        # compile regular expressions for combinatorial outers
+        self._generate_outer_regex(o_type)
+
+
+
 
 
     def _generate_clusters_and_get_cluster_tags(self, all_outers, all_inners, search,
@@ -330,6 +347,10 @@ class SequenceTags:
         elif search == 'InnerCombinatorial':
             self._generate_inner_combinatorial_groups(all_inners, group,
                     i_type, i_orientation)
+
+        elif search == 'OuterCombinatorial':
+            self._generate_outer_combinatorial_groups(all_outers, group,
+                    o_type, o_orientation)
 
         elif search == 'HierarchicalCombinatorial':
             pass

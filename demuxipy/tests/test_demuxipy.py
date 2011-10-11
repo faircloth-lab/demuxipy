@@ -377,6 +377,21 @@ class TestSequenceTagsGroupMethods(unittest.TestCase):
                 }
         self.outer_groups(p, clust)
 
+    def test_outer_map(self):
+        p = Parameters(self.conf)
+        p.search = 'OuterGroups'
+        clust = {
+                'ATACGACGTA':
+                    {
+                        'None':'shrimp',
+                    },
+                'TCACGTACTA':
+                    {
+                        'None':'lobsters'
+                    }
+                }
+        self.check_map(p, clust)
+
     def test_inner_outer_inners(self):
         p = Parameters(self.conf)
         # reset group
@@ -394,6 +409,57 @@ class TestSequenceTagsGroupMethods(unittest.TestCase):
                 }
         self.inner_groups(p, clust)
 
+    def test_inner_outer_map(self):
+        p = Parameters(self.conf)
+        # reset group
+        p.search = 'OuterInnerGroups'
+        clust = {
+                'TCACGTACTA': 
+                    {
+                        'CGTCGTGCGGAATC': 'pony'
+                    },
+                'ATACGACGTA':
+                    {
+                        'CGTCGTGCGGAATC': 'cat',
+                        'GCTGCTGGCGAATC': 'dog'
+                    }
+                }
+        self.check_map(p, clust)
+
+    def test_inners(self):
+        p = Parameters(self.conf)
+        p.search = 'InnerGroups'
+        clust = {
+                'None':
+                    {
+                        'CGTCGTGCGGAATC':'walrus',
+                        'GCTGCTGGCGAATC':'whale',
+                        'CGTGCTGCGGAACT':'porpoise'
+                    }
+                }
+        self.inner_groups(p, clust)
+    
+    def test_inner_map(self):
+        p = Parameters(self.conf)
+        p.search = 'InnerGroups'
+        clust = {
+                'None':
+                    {
+                        'CGTCGTGCGGAATC':'walrus',
+                        'GCTGCTGGCGAATC':'whale',
+                        'CGTGCTGCGGAACT':'porpoise'
+                    }
+                }
+        self.check_map(p, clust)
+
+    def check_map(self, p, mp):
+        p.sequence_tags = None
+        p.sequence_tags = self.refresh(p)
+        for k,v in p.sequence_tags.cluster_map.iteritems():
+            if type(v) is defaultdict:
+                for i,j in v.iteritems():
+                    assert mp[k][i] == j
+
     def outer_groups(self, p, mp):
         for t in self.tests:
             p.outer_type, p.outer_orientation = t[0], t[1]
@@ -408,7 +474,7 @@ class TestSequenceTagsGroupMethods(unittest.TestCase):
                         'forward_regex'
                     ])
                 assert p.sequence_tags.outers['forward_string'] == \
-                    self.outers, pdb.set_trace()
+                    self.outers
                 assert self.regex(p.sequence_tags.outers['forward_regex'],
                         self.outers, p.outer_buffer)
             else:
@@ -481,13 +547,47 @@ class TestSequenceTagsGroupMethods(unittest.TestCase):
                         assert self.regex(p.sequence_tags.inners[outer]['reverse_regex'],
                             revs, p.inner_buffer, True)
 
+    def test_outer_combo(self):
+        p = Parameters(self.conf)
+        p.search = 'OuterCombinatorial'
+        clust = {
+                'None':
+                    {
+                        'ATACGACGTA,TCACGTACTA': 'cat',
+                        'TCACGTACTA,ATACGACGTA': 'dog',
+                    }
+                }
+        self.outer_combo_groups(p)
+
+    def outer_combo_groups(self, p):
+        for t in ['reverse', 'forward']:
+            # t[0] == 'single' has no meaning in combinatorial context
+            p.outer_type = 'both'
+            p.outer_orientation = t
+            p.outer_buffer = 5
+            p.sequence_tags = None
+            p.sequence_tags = self.refresh(p)
+            #pdb.set_trace()
+            assert set(p.sequence_tags.outers.keys()) == \
+                    set([
+                        'forward_string',
+                        'forward_regex',
+                        'reverse_string',
+                        'reverse_regex'
+                        ])
+            if t[1] == 'reverse':
+                assert p.sequence_tags.outers['forward_string'] == \
+                    self.outers
+                assert self.regex(p.sequence_tags.outers['forward_regex'],
+                    self.outers, p.outer_buffer)
+                assert p.sequence_tags.outers['reverse_string'] == \
+                    self.rev_outers
+                assert self.regex(p.sequence_tags.outers['reverse_regex'],
+                    self.rev_outers, p.outer_buffer, True)
 
 
 
-
-
-
-
+'''
 class TestSequenceTagsCombinatorialMethods(unittest.TestCase):
     def setUp(self):
         conf = ConfigParser.ConfigParser()
@@ -564,24 +664,10 @@ class TestSequenceTagsCombinatorialMethods(unittest.TestCase):
             }
         self._combinatorial_tester('Forward','Both', expected)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
     def tearDown(self):
         del(self.p)
 
-
-
+'''
 
 if __name__ == '__main__':
     unittest.main()
