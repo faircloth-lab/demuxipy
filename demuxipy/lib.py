@@ -38,10 +38,7 @@ class ListQueue(list):
         """return an item from the list"""
         return self.pop()
 
-    def __repr__(self):
-        return "ListQueue"
-
-class Parameters():
+class Parameters:
     '''linkers.py run parameters'''
     def __init__(self, conf):
         self.conf = conf
@@ -93,8 +90,11 @@ class Parameters():
         else:
             self.num_procs = 1
 
+    def __str__(self):
+        return "{0}({1})".format(self.__class__, self.__dict__)
+
     def __repr__(self):
-        return '''<linkers.parameters run values>'''
+        return "<{0} instance at {1}>".format(self.__class__, hex(id(self)))
 
     def _get_all_outer(self):
         # if only linkers, you don't need MIDs
@@ -131,17 +131,17 @@ class Parameters():
         assert self.outer_type.lower() in ['single','both'], \
                 "Outer type must be one of ['Single','Both']"
         assert self.outer_orientation.lower() in ['reverse','forward'], \
-                "Outer type must be one of ['Single','Both']"
+                "Innert Orientation must be one of ['Forward','Reverse']"
         assert self.inner_type.lower() in ['single','both'], \
                 "Outer type must be one of ['Single','Both']"
         assert self.inner_orientation.lower() in ['reverse','forward'], \
-                "Outer type must be one of ['Single','Both']"
+                "Inner orientation must be one of ['Forward','Reverse']"
         assert self.search.lower() in \
                 ['innergroups','outergroups','outerinnergroups'], \
                 "SearchFor must be one of ['InnerGroups','OuterGroups'," +\
                 "'OuterInnerGroups']"
 
-class SequenceTags():
+class SequenceTags:
     """ """
     def __init__(self, all_outers, all_inners, search, group, outer_gap, inner_gap,
             concat, o_type, o_orientation, i_type, i_orientation):
@@ -165,6 +165,12 @@ class SequenceTags():
         # do we check for concatemers?
         if concat:
             self._all_possible_tags(search)
+    
+    def __str__(self):
+        return "{0}({1})".format(self.__class__, self.__dict__)
+
+    def __repr__(self):
+        return "<{0} instance at {1}>".format(self.__class__, hex(id(self)))
 
     def _get_length(self, tags):
         #linkers         = dict(self.conf.items('Linker'))
@@ -182,6 +188,17 @@ class SequenceTags():
 
     def _reverse_dict(self, d):
         return {v:k for k,v in d.iteritems()}
+
+    def _parse_group(self, row, length = False):
+        if length == 'short':
+            m = row[0].replace(' ','')
+            return m, row[1]
+        elif length == 'long':
+            o1,i1,o2,i2 =  row[0].replace(' ','').split(',')
+            return o1,i1,o2,i2,row[1]
+        else:
+            m,l = row[0].replace(' ','').split(',')
+            return m, l, row[1]
 
     def _generate_outer_regex(self, outer_type):
         # compile regular expressions:
@@ -212,17 +229,14 @@ class SequenceTags():
 
     def _generate_inner_reverse_strings(self, m, l, inner_type,
             inner_orientation):
+        #if inner_type == 'single':
+        #    pdb.set_trace()
         if inner_type.lower() == 'both':
             if inner_orientation.lower() == 'reverse':
                 self.inners[str(m)]['reverse_string'].add(DNA_reverse_complement(l))
             else:
                 # reverse orientation really == forward orientation
                 self.inners[str(m)]['reverse_string'].add(l)
-
-    def _parse_group(self, row):
-        m,l = row[0].replace(' ','').split(',')
-        org = row[1]
-        return m, l, org
 
     def _generate_outer_inner_groups(self, all_outers, all_inners, group,
             o_type, o_orientation, i_type, i_orientation):
@@ -241,10 +255,11 @@ class SequenceTags():
         self._generate_outer_regex(o_type)
         self._generate_inner_regex(i_type)
 
+
     def _generate_outer_groups(self, all_outers, group, o_type, o_orientation):
+        self.outers = defaultdict(set)
         for row in group:
-            self.outers = defaultdict(set)
-            m, l, org = self._parse_group(row)
+            m, org = self._parse_group(row, length = 'short')
             self.outers['forward_string'].add(all_outers[m])
             self._generate_outer_reverse_strings(all_outers[m], o_type,
                     o_orientation)
@@ -255,7 +270,7 @@ class SequenceTags():
     def _generate_inner_groups(self, all_inners, group, i_type, i_orientation):
         self.inners = defaultdict(lambda : defaultdict(set))
         for row in group:
-            m, l, org = self._parse_group(row)
+            l, org = self._parse_group(row, length = 'short')
             self.inners[str(self.outers)]['forward_string'].add(all_inners[l])
             self._generate_inner_reverse_strings(None, all_inners[l],
                     i_type, i_orientation)
@@ -323,14 +338,33 @@ class SequenceTags():
         '''Create regular expressions for the forward and reverse complements
         of all of the tags sequences used in a run'''
         # at = all tags; rat = reverse complement all tags
-        self.all_tags = defaultdict(lambda : defaultdict())
-        for m in self.inners:
-            self.all_tags[m]['string'] = \
-                    self.inners[m]['forward_string'].union(self.inners[m]['reverse_string'])
-            self.all_tags[m]['regex'] = [re.compile(t) for t in
-                    self.all_tags[m]['string']]
+        self.all_tags = defaultdict(lambda : defaultdict(set))
+        if self.inners:
+            for m in self.inners:
+                m = str(m)
+                if 'reverse_string' in self.inners[m].keys():
+                    self.all_tags[m]['string'] = \
+                            self.inners[m]['forward_string'].union(self.inners[m]['reverse_string'])
+                else:
+                    self.all_tags[m]['string'] = \
+                             self.all_tags[m]['string'].union(self.inners[m]['forward_string'])
+        else:
+            m = 'None'
+            if 'reverse_string' in self.outers.keys():
+                self.all_tags[m]['string'] = \
+                        self.outers['forward_string'].union(self.outers['reverse_string'])
+            else:
+                self.all_tags[m]['string'] = \
+                             self.all_tags[m]['string'].union(self.outers['forward_string'])
+        # compile
+        self.all_tags[m]['regex'] = [re.compile(t) for t in
+                self.all_tags[m]['string']]
 
-class Tagged():
+
+
+                
+
+class Tagged:
     '''Trimming, tag, and sequence data for individual reads'''
     def __init__(self, sequence):
         # super(Params, self).__init__()
