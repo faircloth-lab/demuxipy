@@ -154,6 +154,10 @@ class TestSequenceTagsSimpleMethods(unittest.TestCase):
             m,l,org = self.p.sequence_tags._parse_group(v)
             assert (m,l,org) == expected
 
+    def test_make_combinatorial_cluster_map(self):
+        name = self.p.sequence_tags._make_combinatorial_cluster_map('ATACGACGTA','TCACGTACTA')
+        assert name == 'ATACGACGTA,TCACGTACTA'
+
 class TestSequenceTagsRegexAndStringMethods(unittest.TestCase):
     def setUp(self):
         conf = ConfigParser.ConfigParser()
@@ -453,6 +457,8 @@ class TestSequenceTagsGroupMethods(unittest.TestCase):
         self.check_map(p, clust)
 
     def check_map(self, p, mp):
+        #if p.search == 'HierarchicalCombinatorial':
+        #   pdb.set_trace()
         p.sequence_tags = None
         p.sequence_tags = self.refresh(p)
         for k,v in p.sequence_tags.cluster_map.iteritems():
@@ -559,6 +565,83 @@ class TestSequenceTagsGroupMethods(unittest.TestCase):
                 }
         self.outer_combo_groups(p)
 
+    def test_outer_combo_map(self):
+        p = Parameters(self.conf)
+        p.search = 'OuterCombinatorial'
+        clust = {
+                'None':
+                    {
+                        'ATACGACGTA,TCACGTACTA': 'cat',
+                        'TCACGTACTA,ATACGACGTA': 'dog',
+                    }
+                }
+        self.check_map(p, clust)
+
+    def test_inner_combo(self):
+        p = Parameters(self.conf)
+        p.search = 'InnerCombinatorial'
+        clust = {
+                'None':
+                    {
+                        'CGTCGTGCGGAATC,GCTGCTGGCGAATC': 'duck',
+                        'GCTGCTGGCGAATC,CGTCGTGCGGAATC': 'goose',
+                    }
+                }
+        self.inner_combo_groups(p, clust)
+
+    def test_inner_combo_map(self):
+        p = Parameters(self.conf)
+        p.search = 'InnerCombinatorial'
+        clust = {
+                'None':
+                    {
+                        'CGTCGTGCGGAATC,GCTGCTGGCGAATC': 'duck',
+                        'GCTGCTGGCGAATC,CGTCGTGCGGAATC': 'goose',
+                    }
+                }
+        self.check_map(p, clust)
+
+    def test_hierarchical_combo_outers(self):
+        p = Parameters(self.conf)
+        p.search = 'HierarchicalCombinatorial'
+        self.outer_combo_groups(p)
+
+    def test_hierarchical_combo_inners(self):
+        p = Parameters(self.conf)
+        p.search = 'HierarchicalCombinatorial'
+        clust = {
+                'TCACGTACTA':
+                    {
+                        'CGTCGTGCGGAATC,GCTGCTGGCGAATC': 'bushbaby',
+                        'GCTGCTGGCGAATC,CGTCGTGCGGAATC': 'hedgehog'
+                    },
+                'ATACGACGTA':
+                    {
+                        'GCTGCTGGCGAATC,CGTCGTGCGGAATC': 'opossum',
+                        'CGTCGTGCGGAATC,GCTGCTGGCGAATC': 'newt'
+                    }
+                }
+        self.inner_combo_groups(p, clust)
+
+
+    def test_hierarchical_combo_map(self):
+        p = Parameters(self.conf)
+        p.search = 'HierarchicalCombinatorial'
+        clust = {
+                'TCACGTACTA':
+                    {
+                        'CGTCGTGCGGAATC,GCTGCTGGCGAATC': 'bushbaby',
+                        'GCTGCTGGCGAATC,CGTCGTGCGGAATC': 'hedgehog'
+                    },
+                'ATACGACGTA':
+                    {
+                        'GCTGCTGGCGAATC,CGTCGTGCGGAATC': 'opossum',
+                        'CGTCGTGCGGAATC,GCTGCTGGCGAATC': 'newt'
+                    }
+                }
+        self.check_map(p, clust)
+
+
     def outer_combo_groups(self, p):
         for t in ['reverse', 'forward']:
             # t[0] == 'single' has no meaning in combinatorial context
@@ -575,7 +658,7 @@ class TestSequenceTagsGroupMethods(unittest.TestCase):
                         'reverse_string',
                         'reverse_regex'
                         ])
-            if t[1] == 'reverse':
+            if t == 'reverse':
                 assert p.sequence_tags.outers['forward_string'] == \
                     self.outers
                 assert self.regex(p.sequence_tags.outers['forward_regex'],
@@ -584,7 +667,69 @@ class TestSequenceTagsGroupMethods(unittest.TestCase):
                     self.rev_outers
                 assert self.regex(p.sequence_tags.outers['reverse_regex'],
                     self.rev_outers, p.outer_buffer, True)
+            else:
+                assert p.sequence_tags.outers['forward_string'] == \
+                    self.outers
+                assert self.regex(p.sequence_tags.outers['forward_regex'],
+                    self.outers, p.outer_buffer)
+                assert p.sequence_tags.outers['reverse_string'] == \
+                    self.outers
+                assert self.regex(p.sequence_tags.outers['reverse_regex'],
+                        self.outers, p.outer_buffer, True)
 
+    def inner_combo_groups(self, p, mp):
+        for t in ['reverse', 'forward']:
+            # t[0] == 'single' has no meaning in combinatorial context
+            p.inner_type = 'both'
+            p.inner_orientation = t
+            p.inner_buffer = 5
+            p.sequence_tags = None
+            p.sequence_tags = self.refresh(p)
+            #pdb.set_trace()
+            for outer in p.sequence_tags.inners:
+                assert set(p.sequence_tags.inners[outer].keys()) == \
+                        set([
+                            'forward_string',
+                            'forward_regex',
+                            'reverse_string',
+                            'reverse_regex'
+                            ])
+                #if p.search == 'HierarchicalCombinatorial':
+                #    pdb.set_trace()
+                if t == 'reverse':
+                    assert p.sequence_tags.inners[outer]['forward_string'] == \
+                        self.inners
+                    assert self.regex(p.sequence_tags.inners[outer]['forward_regex'],
+                        self.inners, p.inner_buffer)
+                    assert p.sequence_tags.inners[outer]['reverse_string'] == \
+                        self.rev_inners
+                    assert self.regex(p.sequence_tags.inners[outer]['reverse_regex'],
+                        self.rev_inners, p.inner_buffer, True)
+                else:
+                    assert p.sequence_tags.inners[outer]['forward_string'] == \
+                        self.inners
+                    assert self.regex(p.sequence_tags.inners[outer]['forward_regex'],
+                        self.inners, p.inner_buffer)
+                    #pdb.set_trace()
+                    revs = set(','.join(mp[outer].keys()).split(','))
+                    assert p.sequence_tags.inners[outer]['reverse_string'] == \
+                        revs
+                    assert self.regex(p.sequence_tags.inners[outer]['reverse_regex'],
+                        revs, p.inner_buffer, True)
+
+class TestSequenceTagsAllPossibleTags(unittest.TestCase):
+    def setUp(self):
+        conf = ConfigParser.ConfigParser()
+        conf.read('./test-data/demuxi-test.conf')
+        self.p = Parameters(conf)
+
+    def refresh(self, obj):
+        return obj._get_sequence_tags(obj._get_all_outer(), 
+                obj._get_all_inner())
+
+    def test_1(self):
+        p.sequence_tags = None
+        p.sequence_tags = self.refresh(p)
 
 
 '''
