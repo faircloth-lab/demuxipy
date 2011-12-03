@@ -49,7 +49,10 @@ class Parameters():
                     self.conf.get('Sequence','fasta').strip("'")))
             self.quality      = os.path.abspath(os.path.expanduser( \
                     self.conf.get('Sequence','quality').strip("'")))
-
+        except ConfigParser.NoOptionError:
+            self.fasta        = os.path.abspath(os.path.expanduser(
+                    self.conf.get('Sequence','fasta').strip("'")))
+            self.quality = None
         except ConfigParser.NoOptionError:
             self.fastq       = self.conf.get('Sequence','fastq').strip("'")
         except ConfigParser.NoOptionError:
@@ -174,7 +177,7 @@ class SequenceTags():
         elif search == 'MidGroups':
             for row in group:
                 self.mids = defaultdict(list)
-                m,l = row[0].replace(' ','').split(',')
+                m = row[0].replace(' ','')
                 org = row[1]
                 self.mids['forward_string'].append(all_mids[m])
                 #self.linkers['string'].append(all_linkers[l])
@@ -186,17 +189,17 @@ class SequenceTags():
         elif search == 'LinkerGroups':
             self.linkers = defaultdict(lambda : defaultdict(list))
             for row in group:
-                m,l = row[0].replace(' ','').split(',')
+                l = row[0].replace(' ','')
                 org = row[1]
                 self.linkers[str(self.mids)]['forward_string'].append(all_linkers[l])
                 self.linkers[str(self.mids)]['reverse_string'].append(DNA_reverse_complement(all_linkers[l]))
-                self.cluster_map['None'][all_linkers[m]] = org
-            for m in self.linkers:
-                self.linkers[m]['forward_regex'] = \
-                    self._build_regex(self.linkers[m]['forward_string'], 
+                self.cluster_map['None'][all_linkers[l]] = org
+            for l in self.linkers:
+                self.linkers[l]['forward_regex'] = \
+                    self._build_regex(self.linkers[l]['forward_string'], 
                     self.linker_gap)
-                self.linkers[m]['reverse_regex'] = \
-                    self._build_regex(self.linkers[m]['reverse_string'],
+                self.linkers[l]['reverse_regex'] = \
+                    self._build_regex(self.linkers[l]['reverse_string'],
                     self.linker_gap, rev = True)
         #pdb.set_trace()
 
