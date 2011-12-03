@@ -28,6 +28,7 @@ import ConfigParser
 from multiprocessing import Process, Queue, JoinableQueue, cpu_count
 
 from seqtools.sequence.fastq import FastqReader
+from seqtools.sequence.fasta import FastaReader
 from seqtools.sequence.fasta import FastaQualityReader
 from seqtools.sequence.transform import DNA_reverse_complement
 
@@ -112,6 +113,7 @@ def get_align_match_position(seq_match_span, start, stop):
 def find_left_linker(s, tag_regexes, tag_strings, max_gap_char, tag_len, fuzzy, errors):
     """Matching methods for left linker - regex first, followed by fuzzy (SW)
     alignment, if the option is passed"""
+    match = None
     for regex in tag_regexes:
         match = regex.search(s)
         if match is not None:
@@ -138,7 +140,8 @@ def find_right_linker(s, tag_regexes, tag_strings, max_gap_char, tag_len,
         fuzzy, errors, tagged):
     """Matching methods for right linker - regex first, followed by fuzzy (SW)
     alignment, if the option is passed"""
-
+    #pdb.set_trace()
+    match = None
     for regex in tag_regexes:
         match = regex.search(s)
         if match is not None:
@@ -183,17 +186,18 @@ def find_and_trim_linkers(tagged, params):
     to locate and trim linkers from sequences"""
     #if '>MID15_NoError_SimpleX1_NoError_FandR' in tagged.read.identifier:
     #    pdb.set_trace()
+    #pdb.set_trace()
     left = find_left_linker(tagged.read.sequence,
-            params.sequence_tags.linkers[tagged.mid]['forward_regex'],
-            params.sequence_tags.linkers[tagged.mid]['forward_string'],
+            params.sequence_tags.linkers[str(tagged.mid)]['forward_regex'],
+            params.sequence_tags.linkers[str(tagged.mid)]['forward_string'],
             params.sequence_tags.linker_gap,
             params.sequence_tags.linker_len,
             params.linker_fuzzy,
             params.linker_allowed_errors)
 
     right = find_right_linker(tagged.read.sequence,
-            params.sequence_tags.linkers[tagged.mid]['reverse_regex'],
-            params.sequence_tags.linkers[tagged.mid]['reverse_string'],
+            params.sequence_tags.linkers[str(tagged.mid)]['reverse_regex'],
+            params.sequence_tags.linkers[str(tagged.mid)]['reverse_string'],
             params.sequence_tags.linker_gap,
             params.sequence_tags.linker_len,
             params.linker_fuzzy,
@@ -359,6 +363,17 @@ def get_work(params):
                     num_reads, params.num_procs)
         else:
             work = FastaQualityReader(params.fasta, params.quality)
+    elif params.fasta and params.quality == None:
+        reads = FastaReader(params.fasta)
+        # get read count of input
+        num_reads = get_sequence_count(params.fasta, 'fasta')
+        if params.num_procs > 1:
+            # split reads into generator objects based on equal
+            # split across cores
+            work = split_fasta_reads_into_groups(reads,
+                    num_reads, params.num_procs)
+        else:
+            work = FastaReader(params.fasta)
     elif params.fastq:
         reads = FastqReader(params.fastq)
         # get read count of input
