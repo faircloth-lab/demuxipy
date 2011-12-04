@@ -220,6 +220,7 @@ class Tagged():
         assert isinstance(sequence,FastaSequence), \
             'The Record class must be instantiated with a FastaSequence object'
         self.read               = sequence # a biopython sequence object
+        self.original_len       = len(sequence)
         self.mid                = None
         self.mid_name           = None
         self.mid_seq            = None
