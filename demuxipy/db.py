@@ -102,20 +102,22 @@ def insert_record_to_db(cur, tagged):
     )
     key = cur.lastrowid
     # pick the actual sequence
-    sequence_pickle = pickle.dumps(tagged.read,1)
+    sequence_pickle = pickle.dumps(tagged.read,pickle.HIGHEST_PROTOCOL)
     cur.execute('''INSERT INTO sequence (
             id,
+            untrimmed_len,
             trimmed_len,
             n_count,
             seq_trimmed,
             record
-        ) 
-        VALUES (?,?,?,?,?)''',
+        )
+        VALUES (?,?,?,?,?,?)''',
         (
             key,
+            tagged.original_len,
             len(tagged.read.sequence),
             tagged.read.sequence.lower().count('n'),
             tagged.read.sequence,
-            sequence_pickle
+            sqlite3.Binary(sequence_pickle)
         )
     )
