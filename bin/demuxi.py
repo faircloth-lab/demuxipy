@@ -79,22 +79,25 @@ def align(seq, tags, allowed_errors):
     high_score = {'tag':None, 'seq_match':None, 'mid_match':None, 'score':None, 
         'start':None, 'end':None, 'matches':None, 'errors':allowed_errors}
     for tag in tags:
-        seq_match, tag_match, score, start, end = pairwise2.align.localms(seq, 
-        tag, 5.0, -4.0, -9.0, -0.5, one_alignment_only=True)[0]
-        seq_match_span  = seq_match[start:end]
-        tag_match_span  = tag_match[start:end]
-        match, errors   = matches(tag, seq_match_span, tag_match_span, allowed_errors)
-        if match >= len(tag)-allowed_errors and match > high_score['matches'] \
-            and errors <= high_score['errors']:
-            high_score['tag'] = tag
-            high_score['seq_match'] = seq_match
-            high_score['tag_match'] = tag_match
-            high_score['score'] = score
-            high_score['start'] = start
-            high_score['end'] = end
-            high_score['matches'] = match
-            high_score['seq_match_span'] = seq_match_span
-            high_score['errors'] = errors
+        result = pairwise2.align.localms(seq,
+            tag, 5.0, -4.0, -9.0, -0.5, 
+            one_alignment_only=True)
+        if result:
+            seq_match, tag_match, score, start, end = result[0]
+            seq_match_span  = seq_match[start:end]
+            tag_match_span  = tag_match[start:end]
+            match, errors   = matches(tag, seq_match_span, tag_match_span, allowed_errors)
+            if match >= len(tag)-allowed_errors and match > high_score['matches'] \
+                and errors <= high_score['errors']:
+                high_score['tag'] = tag
+                high_score['seq_match'] = seq_match
+                high_score['tag_match'] = tag_match
+                high_score['score'] = score
+                high_score['start'] = start
+                high_score['end'] = end
+                high_score['matches'] = match
+                high_score['seq_match_span'] = seq_match_span
+                high_score['errors'] = errors
     if high_score['matches']:
         return high_score['tag'], high_score['matches'], \
         high_score['seq_match'], high_score['seq_match_span'], \
@@ -155,10 +158,12 @@ def find_right_linker(s, tag_regexes, tag_strings, max_gap_char, tag_len,
         match = align(s[-(tag_len + max_gap_char):], tag_strings, errors)
         # we can trim w/o regex
         if match:
+            start_of_slice = len(s) - (tag_len + max_gap_char)
             m_type = 'fuzzy'
             tag_matched = match[0]
             seq_matched = match[3]
             start, stop = get_align_match_position(match[3],match[4], match[5])
+            start, stop = start + start_of_slice, stop + start_of_slice
     if match:
         return DNA_reverse_complement(tag_matched), m_type, start, stop, DNA_reverse_complement(seq_matched)
     else:
@@ -216,7 +221,9 @@ def find_and_trim_linkers(tagged, params):
             and right is not None \
             and left[0] == right[0]:
         # trim the read
-        tagged.read = tagged.read.slice(left[3], right[2], False)
+        tagged.read = tagged.read.slice(
+                left[3], right[2],False
+            )
         # left and right are identical so largely pass back the left
         # info... except for m_type which can be a combination
         tagged.l_tag, tagged.l_seq_match = left[0], left[4]
@@ -226,7 +233,7 @@ def find_and_trim_linkers(tagged, params):
             and left[0] != right[0]:
         # these are no good.  check for within gaps
         # to make sure it's not a spurious match
-        pdb.set_trace()
+        #pdb.set_trace()
         tagged.trimmed = None
         tagged.l_tag, tagged.l_seq_match = None, None
         tagged.l_m_type = "tag-mismatch"
@@ -238,7 +245,7 @@ def find_and_trim_linkers(tagged, params):
         tagged.l_tag, tagged.l_seq_match = left[0], left[4]
         tagged.l_m_type = "{}-left".format(left[1])
 
-    elif right and right[2] >= (len(s) - (len(right[0]) + max_gap_char)):
+    elif right and right[2] >= (len(tagged.read.sequence) - (len(right[0]) + max_gap_char)):
         tagged.read = tagged.read.slice(0, right[2], False)
         tagged.l_tag, tagged.l_seq_match = right[0], right[4]
         tagged.l_m_type = "{}-right".format(right[1])
