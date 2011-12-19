@@ -7,7 +7,7 @@ import argparse
 
 
 from collections import defaultdict
-from tools.fs.args import is_dir, FullPaths
+from seqtools.fs.args import is_dir, FullPaths
 
 import pdb
 
@@ -41,7 +41,6 @@ def main():
     for fasta in glob.glob(os.path.join(args.input, '*.fasta')):
         reads = sum([1 for line in open(fasta, 'rU').readlines() if \
             line.startswith('>')])
-        #pdb.set_trace()
         basename = os.path.basename(fasta)
         dirname = basename.split('.')[0].rstrip('_in')
         cwd = os.path.dirname(fasta)
