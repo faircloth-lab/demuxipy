@@ -34,6 +34,8 @@ def get_args():
             action = FullPaths)
     parser.add_argument('outdir', help = """The ouput directory in which to store
         fasta files""", type = is_dir, action = FullPaths)
+    parser.add_argument('--qual', help = """Output quality values""",
+            action='store_true')
     return parser.parse_args()
 
 def get_groups(cur):
@@ -63,14 +65,22 @@ def main():
     conn = sqlite3.connect(db)
     cur = conn.cursor()
     groups = get_groups(cur)
+    #pdb.set_trace()
     for group in groups:
         if group[0] is None:
             group = "NoTag"
         else:
             group = group[0]
-        outfile = "{}.fasta".format(group)
-        outpath = os.path.join(args.outdir, outfile)
-        fw = fasta.FastaWriter(outpath) 
+        if not args.qual:
+            outfile = "{}.fasta".format(group)
+            outpath = os.path.join(args.outdir, outfile)
+            fw = fasta.FastaWriter(outpath)
+        else:
+            outfile = "{}.fasta".format(group)
+            qualfile = "{}.qual".format(group)
+            outpath = os.path.join(args.outdir, outfile)
+            qualpath = os.path.join(args.outdir, qualfile)
+            fw = fasta.FastaWriter(outpath, qualpath)
         get_and_write_seqs(cur, group, fw)
         fw.close()
         # get reads in group from db
