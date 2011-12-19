@@ -172,7 +172,7 @@ def find_right_linker(s, tag_regexes, tag_strings, max_gap_char, tag_len,
 def mid_trim(tagged, params):
     """Remove the MID tag from the sequence read"""
     #if sequence.id == 'MID_No_Error_ATACGACGTA':
-    #    pdb.set_trace()
+    #   pdb.set_trace()
     mid = find_left_linker(tagged.read.sequence,
             params.sequence_tags.mids['forward_regex'], 
             params.sequence_tags.mids['forward_string'],
@@ -297,6 +297,7 @@ def progress(count, interval, big_interval):
 
 def singleproc(job, results, params, interval = 1000, big_interval = 10000):
     count = 0
+    #pdb.set_trace()
     for sequence in job:
         # for now, we'll keep this here
         tagged = Tagged(sequence)
