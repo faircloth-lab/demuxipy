@@ -188,7 +188,7 @@ class SequenceTags:
         # do we check for concatemers?
         if concat:
             self._all_possible_tags(search)
-    
+
     def __str__(self):
         return "{0}({1})".format(self.__class__, self.__dict__)
 
@@ -201,47 +201,47 @@ class SequenceTags:
         assert len(lset) == 1, "Your {} sequences are difference lengths".format(name)
         return lset.pop()
 
-    def _build_regex(self, tags, gap, rev = False):
+    def _build_regex(self, tags, gap, rev=False):
         if not rev:
             return [re.compile('^[acgtnACGTN]{{0,{}}}{}'.format(gap, seq)) for seq in
                     tags]
         else:
-            return [re.compile('{}[acgtnACGTN]{{0,{}}}$'.format(seq, gap)) 
+            return [re.compile('{}[acgtnACGTN]{{0,{}}}$'.format(seq, gap))
                     for seq in tags]
 
     def _reverse_dict(self, d):
-        return {v:k for k,v in d.iteritems()}
+        return {v:k for k, v in d.iteritems()}
 
-    def _parse_group(self, row, length = False):
+    def _parse_group(self, row, length=False):
         if length == 'short':
-            m = row[0].replace(' ','')
+            m = row[0].replace(' ', '')
             return m, row[1]
         elif length == 'long':
-            o1,i1,i2,o2 =  row[0].replace(' ','').split(',')
-            return o1,i1,i2,o2,row[1]
+            o1, i1, i2, o2 = row[0].replace(' ', '').split(',')
+            return o1, i1, i2, o2, row[1]
         else:
-            m,l = row[0].replace(' ','').split(',')
+            m, l = row[0].replace(' ', '').split(',')
             return m, l, row[1]
 
     def _generate_outer_regex(self, outer_type):
         # compile regular expressions:
         self.outers['forward_regex'] = \
-                self._build_regex(self.outers['forward_string'], 
+                self._build_regex(self.outers['forward_string'],
                 self.outer_gap)
         if outer_type.lower() == 'both':
             self.outers['reverse_regex'] = \
-                    self._build_regex(self.outers['reverse_string'], 
-                    self.outer_gap, rev = True)
+                    self._build_regex(self.outers['reverse_string'],
+                    self.outer_gap, rev=True)
 
     def _generate_inner_regex(self, inner_type):
         for m in self.inners:
             self.inners[m]['forward_regex'] = \
-                self._build_regex(self.inners[m]['forward_string'], 
+                self._build_regex(self.inners[m]['forward_string'],
                 self.inner_gap)
             if inner_type.lower() == 'both':
                 self.inners[m]['reverse_regex'] = \
-                    self._build_regex(self.inners[m]['reverse_string'], 
-                    self.inner_gap, rev = True)
+                    self._build_regex(self.inners[m]['reverse_string'],
+                    self.inner_gap, rev=True)
 
     def _generate_outer_reverse_strings(self, m, outer_type, outer_orientation):
         if outer_type.lower() == 'both':
@@ -264,7 +264,7 @@ class SequenceTags:
     def _generate_outer_inner_groups(self, all_outers, all_inners, group,
             o_type, o_orientation, i_type, i_orientation):
         self.outers = defaultdict(set)
-        self.inners = defaultdict(lambda : defaultdict(set))
+        self.inners = defaultdict(lambda: defaultdict(set))
         for row in group:
             m, l, org = self._parse_group(row)
             self.outers['forward_string'].add(all_outers[m])
@@ -278,11 +278,10 @@ class SequenceTags:
         self._generate_outer_regex(o_type)
         self._generate_inner_regex(i_type)
 
-
     def _generate_outer_groups(self, all_outers, group, o_type, o_orientation):
         self.outers = defaultdict(set)
         for row in group:
-            m, org = self._parse_group(row, length = 'short')
+            m, org = self._parse_group(row, length='short')
             self.outers['forward_string'].add(all_outers[m])
             self._generate_outer_reverse_strings(all_outers[m], o_type,
                     o_orientation)
@@ -291,9 +290,9 @@ class SequenceTags:
         self._generate_outer_regex(o_type)
 
     def _generate_inner_groups(self, all_inners, group, i_type, i_orientation):
-        self.inners = defaultdict(lambda : defaultdict(set))
+        self.inners = defaultdict(lambda: defaultdict(set))
         for row in group:
-            l, org = self._parse_group(row, length = 'short')
+            l, org = self._parse_group(row, length='short')
             self.inners['None']['forward_string'].add(all_inners[l])
             self._generate_inner_reverse_strings(None, all_inners[l],
                     i_type, i_orientation)
@@ -302,7 +301,7 @@ class SequenceTags:
         self._generate_inner_regex(i_type)
 
     def _make_combinatorial_cluster_map(self, ll, rl):
-        return "{},{}".format(ll,rl)
+        return "{},{}".format(ll, rl)
 
     def _generate_inner_combinatorial_groups(self, all_inners, group,
             i_type, i_orientation):
@@ -334,9 +333,9 @@ class SequenceTags:
     def _generate_hierarchical_combinatorial_groups(self, all_outers, all_inners,
             group, o_type, o_orientation, i_type, i_orientation):
         self.outers = defaultdict(set)
-        self.inners = defaultdict(lambda : defaultdict(set))
+        self.inners = defaultdict(lambda: defaultdict(set))
         for row in group:
-            m, ll, rl, n, org = self._parse_group(row, length = 'long')
+            m, ll, rl, n, org = self._parse_group(row, length='long')
             #pdb.set_trace()
             assert m == n, "Outer tags in hierarchical combo must agree"
             self.outers['forward_string'].add(all_outers[m])
@@ -352,11 +351,10 @@ class SequenceTags:
         self._generate_outer_regex(o_type)
         self._generate_inner_regex(i_type)
 
-
     def _generate_clusters_and_get_cluster_tags(self, all_outers, all_inners, search,
             group, o_type, o_orientation, i_type, i_orientation):
 
-        self.cluster_map = defaultdict(lambda : defaultdict(str))
+        self.cluster_map = defaultdict(lambda: defaultdict(str))
 
         if search == 'OuterGroups':
             self._generate_outer_groups(all_outers, group, o_type,
@@ -379,7 +377,7 @@ class SequenceTags:
                     o_type, o_orientation)
 
         elif search == 'HierarchicalCombinatorial':
-             self._generate_hierarchical_combinatorial_groups(all_outers,
+            self._generate_hierarchical_combinatorial_groups(all_outers,
                      all_inners, group, o_type, o_orientation, i_type,
                      i_orientation)
 
@@ -387,7 +385,7 @@ class SequenceTags:
         '''Create regular expressions for the forward and reverse complements
         of all of the tags sequences used in a run'''
         # at = all tags; rat = reverse complement all tags
-        self.all_tags = defaultdict(lambda : defaultdict(set))
+        self.all_tags = defaultdict(lambda: defaultdict(set))
         if self.inners:
             for m in self.inners:
                 m = str(m)
@@ -410,32 +408,31 @@ class SequenceTags:
                 self.all_tags[m]['string']]
 
 
-
-                
-
 class Tagged:
     '''Trimming, tag, and sequence data for individual reads'''
     def __init__(self, sequence):
         # super(Params, self).__init__()
-        assert isinstance(sequence,FastaSequence), \
+        assert isinstance(sequence, FastaSequence), \
             'The Record class must be instantiated with a FastaSequence object'
-        self.read               = sequence # a biopython sequence object
-        self.outer              = None
-        self.outer_name         = None
-        self.outer_seq          = None
-        self.outer_match        = None
-        self.outer_type         = None
-        self.inner_name         = None
-        self.inner_seq          = None
-        self.inner_match        = None
-        self.inner_type         = None
-        self.cluster            = None
-        self.concat_seq         = None
-        self.concat_type        = None
-        self.concat_match       = None
-    
+        # a biopython sequence object
+        self.read = sequence
+        self.outer = None
+        self.outer_name = None
+        self.outer_seq = None
+        self.outer_match = None
+        self.outer_type = None
+        self.inner_name = None
+        self.inner_seq = None
+        self.inner_match = None
+        self.inner_type = None
+        self.cluster = None
+        self.concat_seq = None
+        self.concat_type = None
+        self.concat_match = None
+
     #def __repr__(self):
     #    return '''<linkers.record for %s>''' % self.identifier
+
 
 def reverse(items, null=False):
     '''build a reverse dictionary from a list of tuples'''
@@ -443,6 +440,6 @@ def reverse(items, null=False):
     if null:
         items += ((None, None),)
     for i in items:
-        t = (i[1],i[0])
+        t = (i[1], i[0])
         l.append(t)
     return dict(l)
