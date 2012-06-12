@@ -21,72 +21,87 @@ from seqtools.sequence.transform import reverse as DNA_reverse
 
 import pdb
 
+
 class FullPaths(argparse.Action):
     """Expand user- and relative-paths"""
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, os.path.abspath(os.path.expanduser(values)))
 
+
 class ListQueue(list):
     def __init__(self):
         list.__init__(self)
-    
+
     def put(self, item):
         """append an item to the list"""
         self.append(item)
-    
+
     def get(self):
         """return an item from the list"""
         return self.pop()
+
 
 class Parameters:
     '''linkers.py run parameters'''
     def __init__(self, conf):
         self.conf = conf
         try:
-            self.fasta        = os.path.abspath(os.path.expanduser(
-                    self.conf.get('Sequence','fasta').strip("'")))
-            self.quality      = os.path.abspath(os.path.expanduser( \
-                    self.conf.get('Sequence','quality').strip("'")))
-        pdb.set_trace()
+            self.fasta = os.path.abspath(os.path.expanduser(
+                    self.conf.get('Sequence', 'fasta').strip("'")))
+            self.quality = os.path.abspath(os.path.expanduser( \
+                    self.conf.get('Sequence', 'quality').strip("'")))
+        #pdb.set_trace()
         except ConfigParser.NoOptionError:
-            self.fastq       = self.conf.get('Sequence','fastq').strip("'")
+            self.r1 = self.conf.get('Sequence', 'r1').strip("'")
+            self.r2 = self.conf.get('Sequence', 'r2').strip("'")
+        except ConfigParser.NoOptionError:
+            self.fastq = self.conf.get('Sequence', 'fastq').strip("'")
         except ConfigParser.NoOptionError:
             print "Cannot find valid sequence files in [Sequence] section of {}".format(self.conf)
-        self.db               = self.conf.get('Database','DATABASE')
-        self.qual_trim        = self.conf.getboolean('Quality', 'QualTrim')
-        self.min_qual         = self.conf.getint('Quality', 'MinQualScore')
-        self.outer            = self.conf.getboolean('OuterTags','Search')
-        self.outer_type       = self.conf.get('OuterTags','TrimType')
-        self.outer_buffer     = self.conf.getint('OuterTags','Buffer')
-        self.outer_orientation = self.conf.get('OuterTags','ThreePrimeOrientation')
-        self.outer_trim       = self.conf.getint('OuterTags','Trim')
-        self.outer_fuzzy      = self.conf.getboolean('OuterTags','FuzzyMatching')
-        self.outer_errors     = self.conf.getint('OuterTags','AllowedErrors')
-        self.inner            = self.conf.getboolean('InnerTags', 'Search')
-        self.inner_type       = self.conf.get('InnerTags','TrimType')
-        self.inner_buffer     = self.conf.getint('InnerTags','Buffer')
-        self.inner_orientation = self.conf.get('InnerTags','ThreePrimeOrientation')
-        self.inner_trim       = self.conf.getint('InnerTags','Trim')
-        self.inner_fuzzy      = self.conf.getboolean('InnerTags','FuzzyMatching')
-        self.inner_errors     = self.conf.getint('InnerTags','AllowedErrors')
-        self.concat_check     = self.conf.getboolean('Concatemers','ConcatemerChecking')
-        self.concat_fuzzy     = self.conf.getboolean('Concatemers','ConcatemerFuzzyMatching')
-        self.concat_allowed_errors   = self.conf.getboolean('Concatemers','ConcatemerAllowedErrors')
-        self.search           = self.conf.get('Search','SearchFor')
+        self.db = self.conf.get('Database', 'DATABASE')
+        self.qual_trim = self.conf.getboolean('Quality', 'QualTrim')
+        self.min_qual = self.conf.getint('Quality', 'MinQualScore')
+        self.concat_check = self.conf.getboolean('Concatemers', 'ConcatemerChecking')
+        self.concat_fuzzy = self.conf.getboolean('Concatemers', 'ConcatemerFuzzyMatching')
+        self.concat_allowed_errors = self.conf.getboolean('Concatemers', 'ConcatemerAllowedErrors')
+        self.search = self.conf.get('Search', 'SearchFor')
+        #if self.search.lower() in ['innergroups', 'outerinnergroups', 'hierarchicalcombinatorial']:
+        #    assert self.conf.has_section('InnerTags')
+        #elif self.search == 'OuterGroups':
+        #    assert self.conf.has_section('OuterTags')
+        #elif self.search == 'OuterInnerGroups':
+        #    assert self.conf.has_section('OuterTags')
+        #    assert self.conf.has_section('InnerTags')
+        if self.conf.has_section('OuterTags'):
+            self.outer = self.conf.getboolean('OuterTags', 'Search')
+            self.outer_type = self.conf.get('OuterTags', 'TrimType')
+            self.outer_buffer = self.conf.getint('OuterTags', 'Buffer')
+            self.outer_orientation = self.conf.get('OuterTags', 'ThreePrimeOrientation')
+            self.outer_trim = self.conf.getint('OuterTags', 'Trim')
+            self.outer_fuzzy = self.conf.getboolean('OuterTags', 'FuzzyMatching')
+            self.outer_errors = self.conf.getint('OuterTags', 'AllowedErrors')
+        if self.conf.has_section('InnerTags'):
+            self.inner = self.conf.getboolean('InnerTags', 'Search')
+            self.inner_type = self.conf.get('InnerTags', 'TrimType')
+            self.inner_buffer = self.conf.getint('InnerTags', 'Buffer')
+            self.inner_orientation = self.conf.get('InnerTags', 'ThreePrimeOrientation')
+            self.inner_trim = self.conf.getint('InnerTags', 'Trim')
+            self.inner_fuzzy = self.conf.getboolean('InnerTags', 'FuzzyMatching')
+            self.inner_errors = self.conf.getint('InnerTags', 'AllowedErrors')
         #all_outer             = self._get_all_outer()
         #all_inner             = self._get_all_inner()
         self._check_values()
-        self.sequence_tags    = self._get_sequence_tags(self._get_all_outer(), 
+        self.sequence_tags = self._get_sequence_tags(self._get_all_outer(),
                 self._get_all_inner())
-        
-        self.multiprocessing = conf.get('Multiprocessing', 'Multiprocessing') 
+
+        self.multiprocessing = conf.get('Multiprocessing', 'Multiprocessing')
         # compute # cores for computation; leave 1 for db and 1 for sys
         if self.multiprocessing == True:
-            if conf.get('Multiprocessing','processors').lower() == 'auto' and cpu_count > 2:
+            if conf.get('Multiprocessing', 'processors').lower() == 'auto' and cpu_count > 2:
                 self.num_procs = cpu_count() - 1
-            elif conf.get('Multiprocessing','processors').lower() != 'auto' and \
-                    cpu_count >= conf.getint('Multiprocessing','processors'):
-                self.num_procs = conf.getint('Multiprocessing','processors')
+            elif conf.get('Multiprocessing', 'processors').lower() != 'auto' and \
+                    cpu_count >= conf.getint('Multiprocessing', 'processors'):
+                self.num_procs = conf.getint('Multiprocessing', 'processors')
         else:
             self.num_procs = 1
 
@@ -98,7 +113,7 @@ class Parameters:
 
     def _get_all_outer(self):
         # if only linkers, you don't need MIDs
-        if self.search.lower() in ['outergroups','outerinnergroups',
+        if self.search.lower() in ['outergroups', 'outerinnergroups',
                 'outercombinatorial', 'hierarchicalcombinatorial']:
             return dict(self.conf.items('OuterTagSequences'))
         else:
@@ -106,7 +121,7 @@ class Parameters:
 
     def _get_all_inner(self):
         # if only linkers, you don't need MIDs
-        if self.search.lower() in ['innergroups','outerinnergroups',
+        if self.search.lower() in ['innergroups', 'outerinnergroups',
                 'innercombinatorial', 'hierarchicalcombinatorial']:
             return dict(self.conf.items('InnerTagSequences'))
         else:
@@ -128,18 +143,26 @@ class Parameters:
             )
 
     def _check_values(self):
-        assert self.outer_type.lower() in ['single','both'], \
+        assert self.outer_type.lower() in ['single', 'both'], \
                 "Outer type must be one of ['Single','Both']"
-        assert self.outer_orientation.lower() in ['reverse','forward'], \
+        assert self.outer_orientation.lower() in ['reverse', 'forward'], \
                 "Innert Orientation must be one of ['Forward','Reverse']"
-        assert self.inner_type.lower() in ['single','both'], \
+        assert self.inner_type.lower() in ['single', 'both'], \
                 "Outer type must be one of ['Single','Both']"
-        assert self.inner_orientation.lower() in ['reverse','forward'], \
+        assert self.inner_orientation.lower() in ['reverse', 'forward'], \
                 "Inner orientation must be one of ['Forward','Reverse']"
         assert self.search.lower() in \
-                ['innergroups','outergroups','outerinnergroups'], \
+                [
+                    'innergroups',
+                    'outergroups',
+                    'outerinnergroups',
+                    'outercombinatorial',
+                    'innercombinatorial',
+                    'hierarchicalcombinatorial'
+                ], \
                 "SearchFor must be one of ['InnerGroups','OuterGroups'," +\
                 "'OuterInnerGroups']"
+
 
 class SequenceTags:
     """ """
