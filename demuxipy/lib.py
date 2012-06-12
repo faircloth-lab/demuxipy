@@ -99,7 +99,7 @@ class Parameters:
     def _get_all_outer(self):
         # if only linkers, you don't need MIDs
         if self.search.lower() in ['outergroups','outerinnergroups',
-                'outercombinatorial']:
+                'outercombinatorial', 'hierarchicalcombinatorial']:
             return dict(self.conf.items('OuterTagSequences'))
         else:
             return None
@@ -107,7 +107,7 @@ class Parameters:
     def _get_all_inner(self):
         # if only linkers, you don't need MIDs
         if self.search.lower() in ['innergroups','outerinnergroups',
-                'innercombinatorial']:
+                'innercombinatorial', 'hierarchicalcombinatorial']:
             return dict(self.conf.items('InnerTagSequences'))
         else:
             return None
@@ -194,8 +194,8 @@ class SequenceTags:
             m = row[0].replace(' ','')
             return m, row[1]
         elif length == 'long':
-            o1,i1,o2,i2 =  row[0].replace(' ','').split(',')
-            return o1,i1,o2,i2,row[1]
+            o1,i1,i2,o2 =  row[0].replace(' ','').split(',')
+            return o1,i1,i2,o2,row[1]
         else:
             m,l = row[0].replace(' ','').split(',')
             return m, l, row[1]
@@ -271,41 +271,26 @@ class SequenceTags:
         self.inners = defaultdict(lambda : defaultdict(set))
         for row in group:
             l, org = self._parse_group(row, length = 'short')
-            self.inners[str(self.outers)]['forward_string'].add(all_inners[l])
+            self.inners['None']['forward_string'].add(all_inners[l])
             self._generate_inner_reverse_strings(None, all_inners[l],
                     i_type, i_orientation)
             self.cluster_map['None'][all_inners[l]] = org
         # compile regular expressions for inners
         self._generate_inner_regex(i_type)
 
-    def _make_combinatorial_cluster_map(self, ll, rl, typ, orientation, org):
-        if orientation.lower() == 'reverse':
-            name1 = "{},{}".format(ll, DNA_reverse_complement(rl))
-            if typ.lower() == 'both':
-                name2 = "{},{}".format(DNA_complement(ll), DNA_reverse(rl))
-            else:
-                name2 = None
-        else:
-            name1 = "{},{}".format(ll,rl)
-            if typ.lower() == 'both':
-                name2 = "{},{}".format(DNA_complement(ll),
-                        DNA_complement(rl))
-            else:
-                name2 = None
-        for n in [name1, name2]:
-            if n is not None:
-                self.cluster_map['None'][n] = org
+    def _make_combinatorial_cluster_map(self, ll, rl):
+        return "{},{}".format(ll,rl)
 
     def _generate_inner_combinatorial_groups(self, all_inners, group,
             i_type, i_orientation):
         self.inners = defaultdict(lambda: defaultdict(set))
         for row in group:
             m, l, org = self._parse_group(row)
-            self.inners[str(self.outers)]['forward_string'].add(all_inners[m])
+            self.inners['None']['forward_string'].add(all_inners[m])
             self._generate_inner_reverse_strings(None, all_inners[l],
                     i_type, i_orientation)
-            self._make_combinatorial_cluster_map(all_inners[m], all_inners[l],
-                    i_type, i_orientation, org)
+            name = self._make_combinatorial_cluster_map(all_inners[m], all_inners[l])
+            self.cluster_map['None'][name] = org
         # compile regular expressions for combinatorial inners
         self._generate_inner_regex(i_type)
 
@@ -318,13 +303,31 @@ class SequenceTags:
             self.outers['forward_string'].add(all_outers[m])
             self._generate_outer_reverse_strings(all_outers[l], o_type,
                     o_orientation)
-            self._make_combinatorial_cluster_map(all_outers[m], all_outers[l],
-                    o_type, o_orientation, org)
+            name = self._make_combinatorial_cluster_map(all_outers[m], all_outers[l])
+            self.cluster_map['None'][name] = org
         # compile regular expressions for combinatorial outers
         self._generate_outer_regex(o_type)
 
-
-
+    def _generate_hierarchical_combinatorial_groups(self, all_outers, all_inners,
+            group, o_type, o_orientation, i_type, i_orientation):
+        self.outers = defaultdict(set)
+        self.inners = defaultdict(lambda : defaultdict(set))
+        for row in group:
+            m, ll, rl, n, org = self._parse_group(row, length = 'long')
+            #pdb.set_trace()
+            assert m == n, "Outer tags in hierarchical combo must agree"
+            self.outers['forward_string'].add(all_outers[m])
+            self._generate_outer_reverse_strings(all_outers[m], o_type,
+                    o_orientation)
+            self.inners[all_outers[m]]['forward_string'].add(all_inners[ll])
+            self._generate_inner_reverse_strings(all_outers[m], all_inners[rl],
+                    i_type, i_orientation)
+            name = self._make_combinatorial_cluster_map(all_inners[ll],
+                    all_inners[rl])
+            self.cluster_map[all_outers[m]][name] = org
+        # compile regular expressions for outers and inners
+        self._generate_outer_regex(o_type)
+        self._generate_inner_regex(i_type)
 
 
     def _generate_clusters_and_get_cluster_tags(self, all_outers, all_inners, search,
@@ -332,17 +335,17 @@ class SequenceTags:
 
         self.cluster_map = defaultdict(lambda : defaultdict(str))
 
-        if search == 'OuterInnerGroups':
-            self._generate_outer_inner_groups(all_outers, all_inners, group,
-                    o_type, o_orientation, i_type, i_orientation)
-
-        elif search == 'OuterGroups':
+        if search == 'OuterGroups':
             self._generate_outer_groups(all_outers, group, o_type,
                     o_orientation)
 
         elif search == 'InnerGroups':
             self._generate_inner_groups(all_inners, group, i_type,
                     i_orientation)
+
+        elif search == 'OuterInnerGroups':
+            self._generate_outer_inner_groups(all_outers, all_inners, group,
+                    o_type, o_orientation, i_type, i_orientation)
 
         elif search == 'InnerCombinatorial':
             self._generate_inner_combinatorial_groups(all_inners, group,
@@ -353,7 +356,9 @@ class SequenceTags:
                     o_type, o_orientation)
 
         elif search == 'HierarchicalCombinatorial':
-            pass
+             self._generate_hierarchical_combinatorial_groups(all_outers,
+                     all_inners, group, o_type, o_orientation, i_type,
+                     i_orientation)
 
     def _all_possible_tags(self, search):
         '''Create regular expressions for the forward and reverse complements
