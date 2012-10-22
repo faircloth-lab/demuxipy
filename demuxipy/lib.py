@@ -50,17 +50,21 @@ class Parameters:
                     self.conf.get('Sequence', 'fasta').strip("'")))
             self.quality = os.path.abspath(os.path.expanduser( \
                     self.conf.get('Sequence', 'quality').strip("'")))
+            self.fastq, self.r1, self.r2 = False, False, False, False
         #pdb.set_trace()
         except ConfigParser.NoOptionError:
             self.r1 = self.conf.get('Sequence', 'r1').strip("'")
             self.r2 = self.conf.get('Sequence', 'r2').strip("'")
+            self.fasta, self.quality, self.fastq = False, False, False
         except ConfigParser.NoOptionError:
             self.fastq = self.conf.get('Sequence', 'fastq').strip("'")
+            self.fasta, self.quality, self.r1, self.r2 = False, False, False, False
         except ConfigParser.NoOptionError:
             print "Cannot find valid sequence files in [Sequence] section of {}".format(self.conf)
         self.db = self.conf.get('Database', 'DATABASE')
         self.qual_trim = self.conf.getboolean('Quality', 'QualTrim')
         self.min_qual = self.conf.getint('Quality', 'MinQualScore')
+        self.drop = self.conf.getboolean('Quality', 'DropN')
         self.concat_check = self.conf.getboolean('Concatemers', 'ConcatemerChecking')
         self.concat_fuzzy = self.conf.getboolean('Concatemers', 'ConcatemerFuzzyMatching')
         self.concat_allowed_errors = self.conf.getboolean('Concatemers', 'ConcatemerAllowedErrors')
@@ -93,9 +97,17 @@ class Parameters:
         self._check_values()
         self.sequence_tags = self._get_sequence_tags(self._get_all_outer(),
                 self._get_all_inner())
-
-        self.multiprocessing = conf.get('Multiprocessing', 'Multiprocessing')
+        if self.conf.has_section('Primers'):
+            self.primers = Primers(
+                    self.conf.get('Primers', 'Forward'),
+                    self.conf.get('Primers', 'Reverse'),
+                    self.conf.getint('Primers', 'Buffer'),
+                    self.conf.getboolean('Primers', 'FuzzyMatching'),
+                    self.conf.getint('Primers', 'AllowedErrors')
+                )
+        self.multiprocessing = conf.getboolean('Multiprocessing', 'Multiprocessing')
         # compute # cores for computation; leave 1 for db and 1 for sys
+        #pdb.set_trace()
         if self.multiprocessing == True:
             if conf.get('Multiprocessing', 'processors').lower() == 'auto' and cpu_count > 2:
                 self.num_procs = cpu_count() - 1
@@ -162,6 +174,20 @@ class Parameters:
                 ], \
                 "SearchFor must be one of ['InnerGroups','OuterGroups'," +\
                 "'OuterInnerGroups']"
+
+
+class Primers:
+    def __init__(self, f, r, buff, fuzzy, errors):
+        self.f, self.r = {}, {}
+        self.buff = buff
+        self.fuzzy = fuzzy
+        self.errors = errors
+        self.f['string'] = [f]
+        self.f['len'] = len(f)
+        self.r['string'] = [r]
+        self.r['len'] = len(r)
+        self.f['regex'] = [re.compile('^[acgtnACGTN]{{0,{}}}{}'.format(self.buff, f))]
+        self.r['regex'] = [re.compile('^[acgtnACGTN]{{0,{}}}{}'.format(self.buff, r))]
 
 
 class SequenceTags:
@@ -243,6 +269,16 @@ class SequenceTags:
                     self._build_regex(self.inners[m]['reverse_string'],
                     self.inner_gap, rev=True)
 
+    def _generate_inner_combi_regex(self, inner_type):
+        for m in self.inners:
+            self.inners[m]['forward_regex'] = \
+                self._build_regex(self.inners[m]['forward_string'],
+                self.inner_gap)
+            if inner_type.lower() == 'both':
+                self.inners[m]['reverse_regex'] = \
+                self._build_regex(self.inners[m]['reverse_string'],
+                self.inner_gap)
+
     def _generate_outer_reverse_strings(self, m, outer_type, outer_orientation):
         if outer_type.lower() == 'both':
             if outer_orientation.lower() == 'reverse':
@@ -309,12 +345,14 @@ class SequenceTags:
         for row in group:
             m, l, org = self._parse_group(row)
             self.inners['None']['forward_string'].add(all_inners[m])
-            self._generate_inner_reverse_strings(None, all_inners[l],
-                    i_type, i_orientation)
+            #self._generate_inner_reverse_strings(None, all_inners[l],
+            #        i_type, i_orientation)
+            self.inners['None']['reverse_string'].add(all_inners[l])
             name = self._make_combinatorial_cluster_map(all_inners[m], all_inners[l])
             self.cluster_map['None'][name] = org
         # compile regular expressions for combinatorial inners
-        self._generate_inner_regex(i_type)
+        #self._generate_inner_regex(i_type)
+        self._generate_inner_combi_regex(i_type)
 
     def _generate_outer_combinatorial_groups(self, all_outers, group, o_type,
             o_orientation):
@@ -412,8 +450,8 @@ class Tagged:
     '''Trimming, tag, and sequence data for individual reads'''
     def __init__(self, sequence):
         # super(Params, self).__init__()
-        assert isinstance(sequence, FastaSequence), \
-            'The Record class must be instantiated with a FastaSequence object'
+        #assert isinstance(sequence, FastaSequence), \
+        #    'The Record class must be instantiated with a FastaSequence object'
         # a biopython sequence object
         self.read = sequence
         self.outer = None

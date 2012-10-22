@@ -31,4 +31,5 @@ except ImportError: # pragma: no cover
 from db import *
 from lib import *
 from pairwise2 import *
+from core import *
 from tests import test
