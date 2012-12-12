@@ -452,31 +452,6 @@ def get_work(params):
                 )
         else:
             work = FastaQualityReader(params.fasta, params.quality)
-    '''
-    elif params.fastq:
-        reads = FastqReader(params.fastq)
-        # get read count of input
-        num_reads = get_sequence_count(params.fasta, 'fastq')
-        if params.num_procs > 1:
-            # split reads into generator objects based on equal
-            # split across cores
-            work = split_fasta_reads_into_groups(reads,
-                    num_reads, params.num_procs)
-        else:
-            work = FastqReader(params.fasta, params.quality)
-    elif params.r1 and params.r2:
-        num_reads = get_sequence_count(params.r1, 'fastq')
-        reads1 = FastqReader(params.r1)
-        reads2 = FastqReader(params.r2)
-        if params.num_procs > 1:
-            pass
-            # split reads into generator objects based on equal
-            # split across cores
-            #work = split_fasta_reads_into_groups(reads,
-            #        num_reads, params.num_procs)
-        else:
-            work = imerge(reads1, reads2)
-    '''
     return num_reads, work
 
 
