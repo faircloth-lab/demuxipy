@@ -50,7 +50,7 @@ class Parameters:
                     self.conf.get('Sequence', 'fasta').strip("'")))
             self.quality = os.path.abspath(os.path.expanduser( \
                     self.conf.get('Sequence', 'quality').strip("'")))
-            self.fastq, self.r1, self.r2 = False, False, False, False
+            #self.fastq, self.r1, self.r2 = False, False, False, False
         #pdb.set_trace()
         except ConfigParser.NoOptionError:
             self.r1 = self.conf.get('Sequence', 'r1').strip("'")
