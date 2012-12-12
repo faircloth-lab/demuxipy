@@ -340,7 +340,7 @@ def singleproc(job, results, params, interval = 1000, big_interval = 10000):
                 )
         tagged, tagged.outer_seq, tagged.outer_type, tagged.outer_match = result
         if tagged.outer_seq:
-            tagged.outer_name = params.sequence_tags.reverse_outer_lookup[tagged.outer_seq]
+            tagged.outer_name = params.sequence_tags.reverse_outer_lookup.get(tagged.outer_seq)
         # check for Inners
         if (tagged.outer_seq and (params.search == 'OuterInnerGroups' or params.search == 'InnerGroups')):
             assert params.inner, "Search != for Inner tags."
@@ -375,10 +375,10 @@ def singleproc(job, results, params, interval = 1000, big_interval = 10000):
                 )
             tagged, tagged.inner_seq, tagged.inner_type, tagged.inner_match = result
             if tagged.inner_seq:
-                tagged.inner_name = params.sequence_tags.reverse_inner_lookup[tagged.inner_seq]
+                tagged.inner_name = params.sequence_tags.reverse_inner_lookup.get(tagged.inner_seq)
 
         # lookup cluster name; should => None, None is no outers or inners
-        tagged.cluster = params.sequence_tags.cluster_map[str(tagged.outer_seq)][str(tagged.inner_seq)]
+        tagged.cluster = params.sequence_tags.cluster_map.get(str(tagged.outer_seq)).get(str(tagged.inner_seq))
 
         # check for concatemers
         if (params.concat_check and len(tagged.read.sequence) > 0) and \
