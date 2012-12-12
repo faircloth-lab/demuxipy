@@ -11,30 +11,31 @@ Copyright (c) 2011 Brant C. Faircloth. All rights reserved.
 Description: 
 
 """
-import pdb
 
-import os
+#import os
 import sys
-import re
+#import re
 import gzip
 import time
 import numpy
-import string
-import cPickle
-import sqlite3
+#import string
+#import cPickle
+#import sqlite3
 import argparse
 import itertools
 import ConfigParser
 
-from multiprocessing import Process, Queue, JoinableQueue, cpu_count
+from multiprocessing import Process, Queue, JoinableQueue
 
-from seqtools.sequence.fastq import FastqReader
+#from seqtools.sequence.fastq import FastqReader
 from seqtools.sequence.fasta import FastaQualityReader
 from seqtools.sequence.transform import DNA_reverse_complement
 
 from demuxipy import db
 from demuxipy import pairwise2
 from demuxipy.lib import FullPaths, ListQueue, Tagged, Parameters
+
+import pdb
 
 
 def motd():
@@ -44,10 +45,10 @@ def motd():
     #                       demuxi.py                             #
     #                                                             #
     # Demultiplexing of hierarchically tagged, massively parallel #
-    # DNA sequence reads                                          #
+    # DNA sequence reads from 454 data.                           #
     #                                                             #
     #                                                             #
-    # Copyright (c) 2009-2011 Brant C. Faircloth                  #
+    # Copyright (c) 2009-2012 Brant C. Faircloth                  #
     #                                                             #
     #                                                             #
     # Ecology and Evolutionary Biology                            #
@@ -298,207 +299,97 @@ def progress(count, interval, big_interval):
         sys.stdout.flush()
 
 def singleproc(job, results, params, interval = 1000, big_interval = 10000):
-    count =  3934233
-    fseq = ['AGAGTTTGATCCTGGCTCAG']
-    f = [re.compile('^[acgtnACGTN]{{0,{}}}{}'.format(3, fseq[0]))]
-    rseq = ['TGCTGCCTCCCGTAGGAGT']
-    r = [re.compile('^[acgtnACGTN]{{0,{}}}{}'.format(3, rseq[0]))]
-    outf = open('L001-002-demultiplexed-no-N.fasta', 'w')
+    count = 0
     for sequence in job:
-        if len(sequence) == 2:
-            fmatch, forward, rmatch, reverse, fprimer, rprimer = None, None, None, None, None, None
-            r1t = Tagged(sequence[0])
-            r2t = Tagged(sequence[1])
+        #pdb.set_trace()
+        # for now, we'll keep this here
+        tagged = Tagged(sequence)
+        # trim
+        if params.qual_trim:
             #pdb.set_trace()
-            #pdb.set_trace()
-            if params.qual_trim:
-                r1t.read, r2t.read = [i.read.trim(params.min_qual, False) for i in [r1t, r2t]]
-            #print r1t.read.sequence, r2t.read.sequence
-            if params.search == 'InnerCombinatorial':
-                for k, read in enumerate([r1t, r2t]):
-                    fmatch = find_left_tag(read.read.sequence,
-                            params.sequence_tags.inners['None']['forward_regex'],
-                            params.sequence_tags.inners['None']['forward_string'],
-                            params.sequence_tags.inner_gap,
-                            params.sequence_tags.inner_len,
-                            params.inner_fuzzy,
-                            params.inner_errors
-                    )
-                    if fmatch:
-                        forward = read
-                        break
-                for k, read in enumerate([r1t, r2t]):
-                    rmatch = find_left_tag(read.read.sequence,
-                            params.sequence_tags.inners['None']['reverse_regex'],
-                            params.sequence_tags.inners['None']['reverse_string'],
-                            params.sequence_tags.inner_gap,
-                            params.sequence_tags.inner_len,
-                            params.inner_fuzzy,
-                            params.inner_errors
-                    )
-                    if rmatch:
-                        reverse = read
-                        break
-                #if not fmatch:
-                #    rmatch = find_left_tag(r1t.read.sequence,
-                #        params.sequence_tags.inners['None']['reverse_regex'],
-                #        params.sequence_tags.inners['None']['reverse_string'],
-                #        params.sequence_tags.inner_gap,
-                #        params.sequence_tags.inner_len,
-                #        params.inner_fuzzy,
-                #        params.inner_errors
-                #    )
-            #if fmatch and not rmatch:
-            #    rmatch = find_left_tag(r2t.read.sequence,
-            #            params.sequence_tags.inners['None']['reverse_regex'],
-            #            params.sequence_tags.inners['None']['reverse_string'],
-            #            params.sequence_tags.inner_gap,
-            #            params.sequence_tags.inner_len,
-            #            params.inner_fuzzy,
-            #            params.inner_errors
-            #        )
-            #elif rmatch and not fmatch:
-            #    fmatch = find_left_tag(r2t.read.sequence,
-            #            params.sequence_tags.inners['None']['forward_regex'],
-            #            params.sequence_tags.inners['None']['forward_string'],
-            #            params.sequence_tags.inner_gap,
-            #            params.sequence_tags.inner_len,
-            #            params.inner_fuzzy,
-            #            params.inner_errors
-            #        )
-            if forward and reverse:
-                #pdb.set_trace()
-                forward.read = forward.read.slice(fmatch[3] - fmatch[2], len(forward.read.sequence), False)
-                reverse.read = reverse.read.slice(rmatch[3] - rmatch[2], len(reverse.read.sequence), False)
-                forward, fpseq, fptype, fpmatch = trim_one(forward,
-                            f,
-                            fseq,
-                            3,
-                            20,
-                            True,
-                            2
-                    )
-                reverse, rpseq, rptype, rpmatch = trim_one(reverse,
-                            r,
-                            rseq,
-                            3,
-                            20,
-                            True,
-                            2
-                    )
-                #print forward.read.sequence, reverse.read.sequence
-                #print fmatch, rmatch, params.sequence_tags.cluster_map['None']["{},{}".format(fmatch[0],rmatch[0])], (fpseq, fptype, fpmatch), (rpseq, rptype, rpmatch)
-                if (fpseq and rpseq) and "N" not in forward.read.sequence and "N" not in reverse.read.sequence:
-                    well = params.sequence_tags.cluster_map['None']["{},{}".format(fmatch[0],rmatch[0])]
-                    forward.read.append_sequence('N' * 20)
-                    header = ">{0}_{1} {2} orig_bc={3} new_bc={3} bc_diff=0".format(
-                            well,
-                            count,
-                            forward.read.identifier.split(' ')[0],
-                            ''.join([fmatch[0], rmatch[0]])
-                        )
-                    fasta = forward.read.sequence + reverse.read.reverse_complement().sequence
-                    outf.write("{0}\n{1}\n".format(header, fasta))
-                #pdb.set_trace()
-            #    pdb.set_trace()
-            #else:
-            #    print 'pass'
-        elif len(sequence) == 1:
-            # for now, we'll keep this here
-            tagged = Tagged(sequence)
-            # trim
-            if params.qual_trim:
-                #pdb.set_trace()
-                tagged.read = tagged.read.trim(params.min_qual, False)
-            # check for Outers:
-            #pdb.set_trace()
-            if (params.search == 'OuterGroups' or params.search ==
-                    'OuterInnerGroups'):
-                assert params.outer, "Search != True for Outer tags"
-                if params.outer_type.lower() == 'single':
-                    result = trim_one(tagged,
-                        params.sequence_tags.outers['forward_regex'], 
-                        params.sequence_tags.outers['forward_string'],
-                        params.sequence_tags.outer_gap,
-                        params.sequence_tags.outer_len,
-                        params.outer_fuzzy,
-                        params.outer_errors
-                    )
-                elif params.outer_type.lower() == 'both':
-                    if params.outer_orientation.lower() == 'reverse':
-                        revcomp = True
-                    else:
-                        revcomp = False
-                    result = trim_two(tagged,
-                        params.sequence_tags.outers['forward_regex'],
-                        params.sequence_tags.outers['forward_string'],
-                        params.sequence_tags.outers['reverse_regex'],
-                        params.sequence_tags.outers['reverse_string'],
-                        params.sequence_tags.outer_gap,
-                        params.sequence_tags.outer_len,
-                        params.outer_fuzzy,
-                        params.outer_errors,
-                        revcomp
-                    )
-            tagged, tagged.outer_seq, tagged.outer_type, \
-                    tagged.outer_match = result
-            if tagged.outer_seq:
-                tagged.outer_name = params.sequence_tags.reverse_outer_lookup[tagged.outer_seq]
-            else:
-                tagged.outer_name = str(tagged.outer_seq)
-            # check for linkers
-            if (tagged.outer_seq and params.search == 'OuterInnerGroups' \
-                        or params.search == 'InnerGroups'):
-                assert params.inner, "Search != for Inner tags."
-                if params.inner_type.lower() == 'single':
-                    result = trim_one(tagged, 
-                        params.sequence_tags.inners[tagged.outer_seq]['forward_regex'],
-                        params.sequence_tags.inners[tagged.outer_seq]['forward_string'],
-                        params.sequence_tags.inners[tagged.outer_seq]['reverse_regex'],
-                        params.sequence_tags.inners[tagged.outer_seq]['reverse_string'],
-                        params.sequence_tags.inner_gap,
-                        params.sequence_tags.inner_len,
-                        params.inner_fuzzy,
-                        params.inner_errors
-                    )
-                elif params.inner_type.lower() == 'both':
-                    if params.outer_orientation.lower() == 'reverse':
-                        revcomp = True
-                    else:
-                        revcomp = False
-                    result = trim_two(tagged, 
-                        params.sequence_tags.inners[tagged.outer_seq]['forward_regex'],
-                        params.sequence_tags.inners[tagged.outer_seq]['forward_string'],
-                        params.sequence_tags.inners[tagged.outer_seq]['reverse_regex'],
-                        params.sequence_tags.inners[tagged.outer_seq]['reverse_string'],
-                        params.sequence_tags.inner_gap,
-                        params.sequence_tags.inner_len,
-                        params.inner_fuzzy,
-                        params.inner_errors,
-                        revcomp
-                    )
-                tagged, tagged.inner_seq, tagged.inner_type, \
-                        tagged.inner_match = result
-                if tagged.inner_seq:
-                    tagged.inner_name = params.sequence_tags.reverse_inner_lookup[tagged.inner_seq]
+            tagged.read = tagged.read.trim(params.min_qual, False)
+        # check for Outers:
+        if (params.search == 'OuterGroups' or params.search == 'OuterInnerGroups'):
+            assert params.outer, "Search != True for Outer tags"
+            if params.outer_type.lower() == 'single':
+                result = trim_one(
+                    tagged,
+                    params.sequence_tags.outers['forward_regex'],
+                    params.sequence_tags.outers['forward_string'],
+                    params.sequence_tags.outer_gap,
+                    params.sequence_tags.outer_len,
+                    params.outer_fuzzy,
+                    params.outer_errors
+                )
+            elif params.outer_type.lower() == 'both':
+                if params.outer_orientation.lower() == 'reverse':
+                    revcomp = True
                 else:
-                    tagged.inner_seq = str(tagged.outer_seq)
+                    revcomp = False
+                result = trim_two(
+                    tagged,
+                    params.sequence_tags.outers['forward_regex'],
+                    params.sequence_tags.outers['forward_string'],
+                    params.sequence_tags.outers['reverse_regex'],
+                    params.sequence_tags.outers['reverse_string'],
+                    params.sequence_tags.outer_gap,
+                    params.sequence_tags.outer_len,
+                    params.outer_fuzzy,
+                    params.outer_errors,
+                    revcomp
+                )
+        tagged, tagged.outer_seq, tagged.outer_type, tagged.outer_match = result
+        if tagged.outer_seq:
+            tagged.outer_name = params.sequence_tags.reverse_outer_lookup[tagged.outer_seq]
+        # check for Inners
+        if (tagged.outer_seq and (params.search == 'OuterInnerGroups' or params.search == 'InnerGroups')):
+            assert params.inner, "Search != for Inner tags."
+            if params.inner_type.lower() == 'single':
+                result = trim_one(
+                    tagged,
+                    params.sequence_tags.inners[tagged.outer_seq]['forward_regex'],
+                    params.sequence_tags.inners[tagged.outer_seq]['forward_string'],
+                    params.sequence_tags.inners[tagged.outer_seq]['reverse_regex'],
+                    params.sequence_tags.inners[tagged.outer_seq]['reverse_string'],
+                    params.sequence_tags.inner_gap,
+                    params.sequence_tags.inner_len,
+                    params.inner_fuzzy,
+                    params.inner_errors
+                )
+            elif params.inner_type.lower() == 'both':
+                if params.outer_orientation.lower() == 'reverse':
+                    revcomp = True
+                else:
+                    revcomp = False
+                result = trim_two(
+                    tagged,
+                    params.sequence_tags.inners[tagged.outer_seq]['forward_regex'],
+                    params.sequence_tags.inners[tagged.outer_seq]['forward_string'],
+                    params.sequence_tags.inners[tagged.outer_seq]['reverse_regex'],
+                    params.sequence_tags.inners[tagged.outer_seq]['reverse_string'],
+                    params.sequence_tags.inner_gap,
+                    params.sequence_tags.inner_len,
+                    params.inner_fuzzy,
+                    params.inner_errors,
+                    revcomp
+                )
+            tagged, tagged.inner_seq, tagged.inner_type, tagged.inner_match = result
+            if tagged.inner_seq:
+                tagged.inner_name = params.sequence_tags.reverse_inner_lookup[tagged.inner_seq]
 
-            # lookup cluster name; should => None, None is no outers or inners
-            tagged.cluster = params.sequence_tags.cluster_map[str(tagged.outer_seq)][str(tagged.inner_seq)]
+        # lookup cluster name; should => None, None is no outers or inners
+        tagged.cluster = params.sequence_tags.cluster_map[str(tagged.outer_seq)][str(tagged.inner_seq)]
 
-            # check for concatemers
-            if (params.concat_check and len(tagged.read.sequence) > 0) and \
-                    ((tagged.outer_seq and tagged.inner_seq and params.search ==
-                        'OuterInnerGroups') or \
-                    (tagged.outer_seq and params.search == 'OuterGroups') or \
-                    (tagged.inner_seq and params.search == 'InnerGroups')):
-                tagged = concat_check(tagged, params)
-
+        # check for concatemers
+        if (params.concat_check and len(tagged.read.sequence) > 0) and \
+                ((tagged.outer_seq and tagged.inner_seq and params.search ==
+                    'OuterInnerGroups') or \
+                (tagged.outer_seq and params.search == 'OuterGroups') or \
+                (tagged.inner_seq and params.search == 'InnerGroups')):
+            tagged = concat_check(tagged, params)
         count += 1
         progress(count, interval, big_interval)
-        #results.put(tagged)
-    outf.close()
+        results.put(tagged)
     return results
 
 
@@ -532,7 +423,8 @@ def get_sequence_count(input, kind):
 
 def split_fasta_reads_into_groups(reads, num_reads, num_procs):
     job_size = num_reads / num_procs
-    print "Parsing reads into groups of {} reads".format(job_size)
+    sys.stdout.write("Parsing reads into groups of {} reads\n".format(job_size))
+    sys.stdout.flush()
     i = iter(reads)
     chunk = list(itertools.islice(i, job_size))
     while chunk:
@@ -553,10 +445,14 @@ def get_work(params):
         if params.num_procs > 1:
             # split reads into generator objects based on equal
             # split across cores
-            work = split_fasta_reads_into_groups(reads,
-                    num_reads, params.num_procs)
+            work = split_fasta_reads_into_groups(
+                    reads,
+                    num_reads,
+                    params.num_procs
+                )
         else:
             work = FastaQualityReader(params.fasta, params.quality)
+    '''
     elif params.fastq:
         reads = FastqReader(params.fastq)
         # get read count of input
@@ -580,8 +476,9 @@ def get_work(params):
             #        num_reads, params.num_procs)
         else:
             work = imerge(reads1, reads2)
-
+    '''
     return num_reads, work
+
 
 def main():
     """Main loop"""
@@ -593,15 +490,11 @@ def main():
     conf = ConfigParser.ConfigParser()
     conf.read(args.config)
     params = Parameters(conf)
-    #pdb.set_trace()
-    # create the db and tables, returninn connection
+    # create the db and tables, returning connection
     # and cursor
     conn, cur = db.create_db_and_new_tables(params.db)
     # get num reads and split up work
     num_reads, work = get_work(params)
-    # give some indication of progress for longer runs
-    if num_reads > 999:
-        sys.stdout.write('Running')
     #pdb.set_trace()
     # MULTICORE
     if params.multiprocessing and params.num_procs > 1:
@@ -613,7 +506,9 @@ def main():
         for unit in work:
             jobs.put(unit)
         # setup the processes for the jobs
-        print "Starting {} workers".format(params.num_procs)
+        sys.stdout.write("Starting {} workers\n".format(params.num_procs))
+        sys.stdout.flush()
+        sys.stdout.write('Running')
         # start the worker processes
         [Process(target = multiproc, args=(jobs, results, params)).start()
             for i in xrange(params.num_procs)]
@@ -643,6 +538,7 @@ def main():
         singleproc(work, results, params)
         for tagged in results:
             db.insert_record_to_db(cur, tagged)
+            pdb.set_trace()
     conn.commit()
     cur.close()
     conn.close()
