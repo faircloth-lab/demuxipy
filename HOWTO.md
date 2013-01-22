@@ -1,4 +1,4 @@
-# Running linker-py #
+# Running demuxipy #
 
 There are several things you will likely want to do before you run the program:
 
@@ -10,9 +10,11 @@ There are several things you will likely want to do before you run the program:
 
 3. you will want to add your database parameters to linker-py.conf and make sure that it's setup for multiprocessing.you will want to add your database parameters to the file and make sure that it's setup for multiprocessing.
 
-4. once you do all of that, you probably want to install pylevenshtein (link on the project page above), and then run helpers/levenshtein.py on your configuration file, like so:
+4. once you do all of that, you probably want to install pylevenshtein (link on the project page above).
 
-        python helpers/levenshtein.py --configuration=linker-py.conf \
+5. If you want to validate your sequence tags for the appropriate distance, install [edittag](https://github.com/faircloth-lab/edittag), then run it against your config file::
+
+        python bin/validate_edit_metric_tags.py --configuration=linker-py.conf \
         --section=MidLinkerGroups --verbose
 
     this will let you know the minimum edit distance in your linker combinations, which determines how many errors you can correct.  you need a minimum edit distance of 3 to correct 1 error; 5 to correct 2 errors; 7 to correct 3 errors, etc.  the general formula is:
@@ -25,7 +27,7 @@ There are several things you will likely want to do before you run the program:
 
 1. once all thats done, you can run the program:
 
-        python linker.py --configuration=linker-py.conf
+        python bin/demuxi.py --configuration=linker-py.conf
 
     this should begin running without errors, placing your reads into a table named `sequence` in whatever database you told it to use.     
 
