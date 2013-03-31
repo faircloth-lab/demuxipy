@@ -10,3 +10,4 @@ output/
 build
 dist
 myhtmldocs
+*.so
