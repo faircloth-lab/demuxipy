@@ -47,21 +47,14 @@ class Parameters:
         self.conf = conf
         try:
             self.fasta = os.path.abspath(os.path.expanduser(
-                    self.conf.get('Sequence', 'fasta').strip("'")))
+                    self.conf.get('Input', 'fasta').strip("'")))
             self.quality = os.path.abspath(os.path.expanduser( \
-                    self.conf.get('Sequence', 'quality').strip("'")))
-            #self.fastq, self.r1, self.r2 = False, False, False, False
-        #pdb.set_trace()
+                    self.conf.get('Input', 'quality').strip("'")))
         except ConfigParser.NoOptionError:
-            self.r1 = self.conf.get('Sequence', 'r1').strip("'")
-            self.r2 = self.conf.get('Sequence', 'r2').strip("'")
-            self.fasta, self.quality, self.fastq = False, False, False
-        except ConfigParser.NoOptionError:
-            self.fastq = self.conf.get('Sequence', 'fastq').strip("'")
-            self.fasta, self.quality, self.r1, self.r2 = False, False, False, False
-        except ConfigParser.NoOptionError:
-            print "Cannot find valid sequence files in [Sequence] section of {}".format(self.conf)
-        self.db = self.conf.get('Database', 'DATABASE')
+            raise (IOError, "Cannot find valid sequence/quality files in [Input] section of {}".format(self.conf))
+        self.db = self.conf.get('Output', 'Database')
+        self.output_fasta = self.conf.get('Output', 'Fasta')
+        self.output_qual = self.conf.get('Output', 'Qual')
         self.qual_trim = self.conf.getboolean('Quality', 'QualTrim')
         self.min_qual = self.conf.getint('Quality', 'MinQualScore')
         self.drop = self.conf.getboolean('Quality', 'DropN')

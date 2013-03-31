@@ -40,17 +40,17 @@ def create_db_and_new_tables(db_name):
                 concat_method text
             )'''
         )
-        cur.execute('''CREATE TABLE sequence (
-                id INTEGER,
-                untrimmed_len integer,
-                trimmed_len integer,
-                n_count integer,
-                seq_trimmed text,
-                record blob,
-                FOREIGN KEY(id) REFERENCES tags(id) DEFERRABLE INITIALLY
-                DEFERRED
-            )'''
-        )
+        #cur.execute('''CREATE TABLE sequence (
+        #        id INTEGER,
+        #        untrimmed_len integer,
+        #        trimmed_len integer,
+        #        n_count integer,
+        #        seq_trimmed text,
+        #        record blob,
+        #        FOREIGN KEY(id) REFERENCES tags(id) DEFERRABLE INITIALLY
+        #        DEFERRED
+        #    )'''
+        #)
         cur.execute("CREATE INDEX idx_sequence_cluster on tags(cluster)")
     except sqlite3.OperationalError, e:
         #pdb.set_trace()
@@ -100,22 +100,22 @@ def insert_record_to_db(cur, tagged):
             tagged.concat_type
         )
     )
-    key = cur.lastrowid
+    #key = cur.lastrowid
     # pick the actual sequence
-    sequence_pickle = pickle.dumps(tagged.read,1)
-    cur.execute('''INSERT INTO sequence (
-            id,
-            trimmed_len,
-            n_count,
-            seq_trimmed,
-            record
-        ) 
-        VALUES (?,?,?,?,?)''',
-        (
-            key,
-            len(tagged.read.sequence),
-            tagged.read.sequence.lower().count('n'),
-            tagged.read.sequence,
-            sequence_pickle
-        )
-    )
+    #sequence_pickle = pickle.dumps(tagged.read,1)
+    #cur.execute('''INSERT INTO sequence (
+    #        id,
+    #        trimmed_len,
+    #        n_count,
+    #        seq_trimmed,
+    #        record
+    #    ) 
+    #    VALUES (?,?,?,?,?)''',
+    #    (
+    #        key,
+    #        len(tagged.read.sequence),
+    #        tagged.read.sequence.lower().count('n'),
+    #        tagged.read.sequence,
+    #        sequence_pickle
+    #    )
+    #)

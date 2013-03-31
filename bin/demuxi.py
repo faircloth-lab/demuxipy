@@ -29,6 +29,7 @@ from multiprocessing import Process, Queue, JoinableQueue
 
 #from seqtools.sequence.fastq import FastqReader
 from seqtools.sequence.fasta import FastaQualityReader
+from seqtools.sequence.fasta import FastaWriter
 from seqtools.sequence.transform import DNA_reverse_complement
 
 from demuxipy import db
@@ -378,8 +379,10 @@ def singleproc(job, results, params, interval = 1000, big_interval = 10000):
                 tagged.inner_name = params.sequence_tags.reverse_inner_lookup.get(tagged.inner_seq)
 
         # lookup cluster name; should => None, None is no outers or inners
-        tagged.cluster = params.sequence_tags.cluster_map.get(str(tagged.outer_seq)).get(str(tagged.inner_seq))
-
+        if tagged.outer_seq and tagged.inner_seq:
+            tagged.cluster = params.sequence_tags.cluster_map.get(str(tagged.outer_seq)).get(str(tagged.inner_seq))
+        else:
+            tagged.cluster = None
         # check for concatemers
         if (params.concat_check and len(tagged.read.sequence) > 0) and \
                 ((tagged.outer_seq and tagged.inner_seq and params.search ==
@@ -470,7 +473,8 @@ def main():
     conn, cur = db.create_db_and_new_tables(params.db)
     # get num reads and split up work
     num_reads, work = get_work(params)
-    #pdb.set_trace()
+    # setup monolithic output files
+    outf = FastaWriter(params.output_fasta, params.output_qual)
     # MULTICORE
     if params.multiprocessing and params.num_procs > 1:
         jobs = Queue()
@@ -492,9 +496,16 @@ def main():
         # a rather consistent rate rather than in spurts
         #for unit in xrange(num_reads):
         for unit in xrange(num_reads):
-            #enter_to_db(results.get())
-            db.insert_record_to_db(cur, results.get())
+            tagged = results.get()
             results.task_done()
+            db.insert_record_to_db(cur, tagged)
+            if tagged.cluster:
+                tagged.read.identifier += " cluster={0} outer={1} inner={2}".format(
+                    tagged.cluster,
+                    tagged.outer_type,
+                    tagged.inner_type
+                )
+                outf.write(tagged.read)
         # make sure we put None at end of Queue
         # in an amount equiv. to num_procs
         for unit in xrange(params.num_procs):
@@ -513,10 +524,17 @@ def main():
         singleproc(work, results, params)
         for tagged in results:
             db.insert_record_to_db(cur, tagged)
-            pdb.set_trace()
+            if tagged.cluster:
+                tagged.read.identifier += " cluster={0} outer={1} inner={2}".format(
+                    tagged.cluster,
+                    tagged.outer_type,
+                    tagged.inner_type
+                )
+                outf.write(tagged.read)
     conn.commit()
     cur.close()
     conn.close()
+    outf.close()
     end_time = time.time()
     pretty_end_time = time.strftime("%a %b %d, %Y  %H:%M:%S", time.localtime(end_time))
     print "\nEnded: {} (run time {} minutes)".format(pretty_end_time,
