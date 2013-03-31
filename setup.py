@@ -26,8 +26,10 @@ if __name__ == '__main__':
              ],
         requires=['numpy(>=1.3)','seqtools(>=0.5)'],
         long_description=open('README.rst').read(),
-        scripts=['bin/demuxi.py',
-                ],
+        scripts=[
+            'bin/demuxi.py',
+            'bin/demuxi_parse.py'
+            ],
         ext_modules=[
                 Extension(
                     'demuxipy/cpairwise2',
