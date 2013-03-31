@@ -587,7 +587,7 @@ class TestSequenceTagsGroupMethods(unittest.TestCase):
                         'GCTGCTGGCGAATC,CGTCGTGCGGAATC': 'goose',
                     }
                 }
-        self.inner_combo_groups(p, clust)
+        self.check_map(p, clust)
 
     def test_inner_combo_map(self):
         p = Parameters(self.conf)
@@ -728,8 +728,8 @@ class TestSequenceTagsAllPossibleTags(unittest.TestCase):
                 obj._get_all_inner())
 
     def test_1(self):
-        p.sequence_tags = None
-        p.sequence_tags = self.refresh(p)
+        self.p.sequence_tags = None
+        self.p.sequence_tags = self.refresh(self.p)
 
 
 '''
