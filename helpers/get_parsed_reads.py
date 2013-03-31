@@ -217,7 +217,7 @@ def get_read_count_summary_stats(summary):
 
 
 def get_read_summary_per_sample(summary):
-    print "cluster\tn\tcount\tmean\tmedian\t95CI\tmin\tmax"
+    print "cluster\tn\tbp\tmean\tmedian\t95CI\tmin\tmax"
     for k, v in summary.iteritems():
         #pdb.set_trace()
         stats = get_stats(v['length'])
